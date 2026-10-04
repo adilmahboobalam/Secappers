@@ -176,6 +176,25 @@ public class SqliteDatabaseService : IDatabaseService
             // Apply migrations sequentially
             await MigrateSchemaAsync(connection, currentVer, CurrentSchemaVersion);
         }
+
+        // Automatically repair legacy/invalid UpdateManifestUrl endpoints
+        try
+        {
+            using var repairCmd = connection.CreateCommand();
+            repairCmd.CommandText = @"
+                UPDATE AppSettings 
+                SET Value = 'https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json' 
+                WHERE Key = 'UpdateManifestUrl' 
+                  AND (Value LIKE '%github.com/adilmahboobalam/Secappers%' 
+                       OR Value LIKE '%updates.secapper.com%') 
+                  AND Value NOT LIKE '%raw.githubusercontent.com%';
+            ";
+            await repairCmd.ExecuteNonQueryAsync();
+        }
+        catch
+        {
+            // Best-effort repair
+        }
     }
 
     private static async Task MigrateSchemaAsync(SqliteConnection connection, int fromVersion, int toVersion)

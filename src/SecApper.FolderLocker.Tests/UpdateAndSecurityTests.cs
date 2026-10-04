@@ -25,6 +25,20 @@ public class UpdateAndSecurityTests : IDisposable
         _dbPath = Path.Combine(_tempDir, "locker.db");
     }
 
+    [Theory]
+    [InlineData("https://github.com/adilmahboobalam/Secappers.git", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")]
+    [InlineData("https://github.com/adilmahboobalam/Secappers", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")]
+    [InlineData("https://github.com/adilmahboobalam/Secappers/blob/main/latest.json", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")]
+    [InlineData("https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")]
+    [InlineData("https://updates.secapper.com/latest.json", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")]
+    [InlineData("", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")]
+    [InlineData("file:///C:/test/latest.json", "file:///C:/test/latest.json")]
+    public void NormalizeManifestUrl_ConvertsWebUrlsToRawEndpoints(string input, string expected)
+    {
+        string result = UpdateService.NormalizeManifestUrl(input);
+        Assert.Equal(expected, result);
+    }
+
     [Fact]
     public void SemVersion_Comparison_HandlesNumericProperly()
     {

@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using SecApper.Security.Data;
@@ -76,15 +77,14 @@ public class UpdateService : IUpdateService
                 }
             }
 
-            // 2. Resolve manifest URL
-            string? manifestUrl = await _databaseService.GetSettingAsync("UpdateManifestUrl");
-            if (string.IsNullOrWhiteSpace(manifestUrl) || manifestUrl.Contains("updates.secapper.com", StringComparison.OrdinalIgnoreCase))
+            // 2. Resolve and normalize manifest URL
+            string? storedManifest = await _databaseService.GetSettingAsync("UpdateManifestUrl");
+            string manifestUrl = NormalizeManifestUrl(storedManifest);
+
+            // If the database stored a raw web URL or outdated endpoint, auto-heal it
+            if (!string.Equals(storedManifest, manifestUrl, StringComparison.OrdinalIgnoreCase))
             {
-                string localManifest = @"C:\Users\Adi\Desktop\Secapper\latest.json";
-                string programDataManifest = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SecApper", "FolderLocker", "updates", "latest.json");
-                if (File.Exists(localManifest)) manifestUrl = new Uri(localManifest).AbsoluteUri;
-                else if (File.Exists(programDataManifest)) manifestUrl = new Uri(programDataManifest).AbsoluteUri;
-                else manifestUrl = "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json";
+                await _databaseService.SetSettingAsync("UpdateManifestUrl", manifestUrl);
             }
 
             string json;
@@ -127,10 +127,33 @@ public class UpdateService : IUpdateService
                 }
             }
 
-            var updateInfo = JsonSerializer.Deserialize<UpdateInfo>(json, new JsonSerializerOptions
+            if (string.IsNullOrWhiteSpace(json))
             {
-                PropertyNameCaseInsensitive = true
-            });
+                return new UpdateCheckResult(false, null, _currentVersion, "Update check failed: Empty response received from update manifest server.");
+            }
+
+            // Detect if a webpage or HTML error was returned instead of raw JSON
+            if (json.TrimStart().StartsWith("<", StringComparison.Ordinal))
+            {
+                return new UpdateCheckResult(false, null, _currentVersion,
+                    "Update check error: The server returned an HTML webpage instead of a JSON manifest.\n\n" +
+                    $"Manifest Endpoint: {manifestUrl}\n\n" +
+                    "Please ensure the Update Manifest URL points directly to raw JSON (e.g. https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json).");
+            }
+
+            UpdateInfo? updateInfo;
+            try
+            {
+                updateInfo = JsonSerializer.Deserialize<UpdateInfo>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (JsonException ex)
+            {
+                return new UpdateCheckResult(false, null, _currentVersion,
+                    $"Update check error: The update manifest is not valid JSON ({ex.Message}).");
+            }
 
             if (updateInfo == null || string.IsNullOrWhiteSpace(updateInfo.Version) || string.IsNullOrWhiteSpace(updateInfo.DownloadUrl))
             {
@@ -359,5 +382,63 @@ public class UpdateService : IUpdateService
 
             return false;
         }
+    }
+
+    /// <summary>
+    /// Normalizes user-entered or legacy manifest URLs.
+    /// Converts GitHub repo/blob URLs (e.g. github.com/user/repo) into raw JSON endpoints (raw.githubusercontent.com/user/repo/main/latest.json).
+    /// </summary>
+    public static string NormalizeManifestUrl(string? url)
+    {
+        const string DefaultRawUrl = "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json";
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return DefaultRawUrl;
+        }
+
+        url = url.Trim();
+
+        if (url.Contains("updates.secapper.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return DefaultRawUrl;
+        }
+
+        // Keep local file references intact
+        if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase) || File.Exists(url))
+        {
+            return url;
+        }
+
+        // Normalize GitHub repository web links into raw GitHub user content links
+        if (url.Contains("github.com", StringComparison.OrdinalIgnoreCase) && 
+            !url.Contains("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase))
+        {
+            var match = Regex.Match(
+                url, 
+                @"github\.com/(?<owner>[^/]+)/(?<repo>[^/]+?)(?:\.git)?(?:/(?:blob|raw|tree)/(?<branch>[^/]+)(?:/(?<path>.+))?)?/?$", 
+                RegexOptions.IgnoreCase);
+
+            if (match.Success)
+            {
+                string owner = match.Groups["owner"].Value;
+                string repo = match.Groups["repo"].Value;
+                string branch = match.Groups["branch"].Success && !string.IsNullOrWhiteSpace(match.Groups["branch"].Value)
+                    ? match.Groups["branch"].Value
+                    : "main";
+                string path = match.Groups["path"].Success && !string.IsNullOrWhiteSpace(match.Groups["path"].Value)
+                    ? match.Groups["path"].Value
+                    : "latest.json";
+
+                if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                {
+                    path = path.TrimEnd('/') + "/latest.json";
+                }
+
+                return $"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}";
+            }
+        }
+
+        return url;
     }
 }

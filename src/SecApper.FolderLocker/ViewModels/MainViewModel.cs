@@ -293,7 +293,8 @@ public class MainViewModel : ViewModelBase
             {
                 _updateManifestUrl = value;
                 OnPropertyChanged();
-                _ = _databaseService.SetSettingAsync("UpdateManifestUrl", value);
+                string normalized = UpdateService.NormalizeManifestUrl(value);
+                _ = _databaseService.SetSettingAsync("UpdateManifestUrl", normalized);
             }
         }
     }
@@ -1235,8 +1236,9 @@ public class MainViewModel : ViewModelBase
             _updateCheckFrequency = await _databaseService.GetSettingAsync("UpdateCheckFrequency", "Daily") ?? "Daily";
             OnPropertyChanged(nameof(UpdateCheckFrequency));
 
-            _updateManifestUrl = await _databaseService.GetSettingAsync("UpdateManifestUrl", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")
+            string rawUrl = await _databaseService.GetSettingAsync("UpdateManifestUrl", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")
                 ?? "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json";
+            _updateManifestUrl = UpdateService.NormalizeManifestUrl(rawUrl);
             OnPropertyChanged(nameof(UpdateManifestUrl));
 
             string? last = await _databaseService.GetSettingAsync("LastUpdateCheckTime");

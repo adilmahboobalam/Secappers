@@ -1,0 +1,28 @@
+## Build & Output Folders
+bin/
+obj/
+publish/
+installer/output/
+TestResults/
+
+## Visual Studio / IDE
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+## Database local debug locks
+*.db-shm
+*.db-wal

@@ -1,0 +1,9 @@
+{
+  "version": "1.1.0",
+  "releaseDate": "2026-10-04",
+  "downloadUrl": "file:///C:/Users/Adi/Desktop/Secapper/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
+  "sha256": "7d90aad619b5a176e8b9bb84640034ecab8c1602fa3c00093edd8be1e85dbc91",
+  "mandatory": false,
+  "minSupportedVersion": "1.0.0",
+  "releaseNotes": "SecApper v1.1.0 Major Release:\n• Active double-click Windows Explorer unlock popup\n• Native NTFS Discretionary Access Control enforcement\n• Operation journal crash recovery\n• Background ransomware threat protection\n• Standalone zero-downtime auto-updater"
+}

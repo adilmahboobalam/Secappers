@@ -1,0 +1,1718 @@
+<Window x:Class="SecApper.FolderLocker.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:SecApper.FolderLocker.ViewModels"
+        Title="SecApper — Secure Your World"
+        Height="780" Width="1180"
+        MinHeight="680" MinWidth="960"
+        WindowStartupLocation="CenterScreen"
+        Background="#F7F9FC"
+        Foreground="#172033"
+        Icon="Resources/app.ico">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- Brand Color Palette -->
+        <SolidColorBrush x:Key="BrandNavy" Color="#122D55" />
+        <SolidColorBrush x:Key="SidebarNavy" Color="#0E2547" />
+        <SolidColorBrush x:Key="SidebarHover" Color="#162E56" />
+        <SolidColorBrush x:Key="SidebarActive" Color="#18335D" />
+        <SolidColorBrush x:Key="BrandRed" Color="#C5202B" />
+        <SolidColorBrush x:Key="BrandRedHover" Color="#A81B24" />
+        <SolidColorBrush x:Key="CanvasBg" Color="#F7F9FC" />
+        <SolidColorBrush x:Key="CardBg" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="CardBorder" Color="#E5E9F0" />
+        <SolidColorBrush x:Key="TextPrimary" Color="#172033" />
+        <SolidColorBrush x:Key="TextSecondary" Color="#667085" />
+        <SolidColorBrush x:Key="SuccessGreen" Color="#16A34A" />
+        <SolidColorBrush x:Key="WarningAmber" Color="#D97706" />
+
+        <!-- Soft Card Drop Shadow -->
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="12" Direction="270" ShadowDepth="2" Opacity="0.06" Color="#0E2547" />
+        <DropShadowEffect x:Key="LogoShadow" BlurRadius="8" Direction="270" ShadowDepth="1" Opacity="0.12" Color="#000000" />
+        <DropShadowEffect x:Key="ButtonShadow" BlurRadius="6" Direction="270" ShadowDepth="1" Opacity="0.15" Color="#C5202B" />
+
+        <!-- Lucide Vector Geometries -->
+        <StreamGeometry x:Key="GeoDashboard">M4 4h7v7H4z M13 4h7v4h-7z M13 11h7v9h-7z M4 14h7v6H4z</StreamGeometry>
+        <StreamGeometry x:Key="GeoLock">M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2</StreamGeometry>
+        <StreamGeometry x:Key="GeoUnlock">M7 11V7a5 5 0 0 1 9.9-1 M5 11h14v10H5z M12 15v2</StreamGeometry>
+        <StreamGeometry x:Key="GeoFolderLock">M4 4h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M10 13a2 2 0 0 1 4 0v1h1v4H9v-4h1v-1z</StreamGeometry>
+        <StreamGeometry x:Key="GeoShieldAlert">M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M12 8v4 M12 16h.01</StreamGeometry>
+        <StreamGeometry x:Key="GeoShieldCheck">M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4</StreamGeometry>
+        <StreamGeometry x:Key="GeoActivity">M22 12h-4l-3 9L9 3l-3 9H2</StreamGeometry>
+        <StreamGeometry x:Key="GeoRotateCcw">M1 4v6h6 M3.51 15a9 9 0 1 0 2.13-9.36L1 10</StreamGeometry>
+        <StreamGeometry x:Key="GeoDownloadCloud">M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242 M12 12v9 M8 17l4 4 4-4</StreamGeometry>
+        <StreamGeometry x:Key="GeoSettings">M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z</StreamGeometry>
+        <StreamGeometry x:Key="GeoRefresh">M21 2v6h-6 M3 12a9 9 0 0 1 15-6.7L21 8 M3 22v-6h6 M21 12a9 9 0 0 1-15 6.7L3 16</StreamGeometry>
+        <StreamGeometry x:Key="GeoPlus">M12 5v14 M5 12h14</StreamGeometry>
+        <StreamGeometry x:Key="GeoFolder">M4 4h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z</StreamGeometry>
+        <StreamGeometry x:Key="GeoSearch">M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.35-4.35</StreamGeometry>
+        <StreamGeometry x:Key="GeoCheck">M20 6L9 17l-5-5</StreamGeometry>
+        <StreamGeometry x:Key="GeoAlertTriangle">M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01</StreamGeometry>
+        <StreamGeometry x:Key="GeoInfo">M12 16v-4 M12 8h.01 M22 12A10 10 0 1 1 12 2a10 10 0 0 1 10 10z</StreamGeometry>
+        <StreamGeometry x:Key="GeoExternalLink">M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3</StreamGeometry>
+        <StreamGeometry x:Key="GeoTrash">M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2</StreamGeometry>
+
+        <!-- Primary Red Button Style -->
+        <Style x:Key="BrandRedBtn" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource BrandRed}" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="{StaticResource BrandRedHover}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Navy Button Style -->
+        <Style x:Key="NavyBtn" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource BrandNavy}" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="16,9" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1A3B6E" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Outline / Secondary Button Style -->
+        <Style x:Key="OutlineBtn" TargetType="Button">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F1F5F9" />
+                    <Setter Property="BorderBrush" Value="#CBD5E1" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Danger Outline Button Style -->
+        <Style x:Key="DangerOutlineBtn" TargetType="Button">
+            <Setter Property="Background" Value="#FFF1F2" />
+            <Setter Property="Foreground" Value="{StaticResource BrandRed}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#FECDD3" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FFE4E6" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Card Container Style -->
+        <Style x:Key="SecurityCard" TargetType="Border">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardBorder}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="24" />
+            <Setter Property="Effect" Value="{StaticResource CardShadow}" />
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <!-- Fixed Left Sidebar (260px) -->
+            <ColumnDefinition Width="260" />
+            <!-- Main Content Area -->
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ======================================================== -->
+        <!-- 1. FIXED LEFT SIDEBAR (DEEP NAVY #0E2547)               -->
+        <!-- ======================================================== -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarNavy}" BorderBrush="#122D55" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <!-- Logo Header -->
+                    <RowDefinition Height="Auto" />
+                    <!-- Navigation Menu -->
+                    <RowDefinition Height="*" />
+                    <!-- Dynamic Version & Local State Footer -->
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- TOP LOGO HEADER: Official SecApper Logo in Crisp Sharp Container -->
+                <Border Grid.Row="0" Margin="16,20,16,12" Background="#FFFFFF" CornerRadius="10" Padding="14,10" Effect="{StaticResource LogoShadow}">
+                    <Image Source="pack://application:,,,/Resources/logo.png"
+                           Height="68"
+                           Stretch="Uniform"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           ToolTip="SecApper — Secure Your World" />
+                </Border>
+
+                <!-- NAVIGATION MENU -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,4,0,4">
+                    <StackPanel Margin="12,4">
+                        <!-- SECURITY SECTION -->
+                        <TextBlock Text="SECURITY" Foreground="#64748B" FontSize="11" FontWeight="Bold" Margin="14,12,12,6" />
+
+                        <!-- 1. Dashboard -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="Dashboard" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoDashboard}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Dashboard" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="Dashboard">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- 2. Folder Locker -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoLock}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Folder Locker" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="FolderLocker">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- 3. Protected Folders -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoFolderLock}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Protected Folders" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                            <!-- Count badge -->
+                                            <Border Grid.Column="3" Background="#1E3A66" CornerRadius="10" Padding="7,2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding TotalFoldersCount, Mode=OneWay}" Foreground="#93C5FD" FontSize="11" FontWeight="Bold" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="ProtectedFolders">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- 4. Ransomware Protection -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="RansomwareProtection" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoShieldAlert}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Ransomware Protection" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="RansomwareProtection">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- 5. Security Events -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="SecurityEvents" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoActivity}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Security Events" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="SecurityEvents">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- 6. Recovery -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="Recovery" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoRotateCcw}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Recovery Center" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                            <!-- Inconsistency warning dot -->
+                                            <Ellipse Grid.Column="3" Width="8" Height="8" Fill="{StaticResource BrandRed}" Visibility="{Binding HasRecoveryIssues, Converter={StaticResource BoolToVis}}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="Recovery">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- SYSTEM SECTION -->
+                        <TextBlock Text="SYSTEM" Foreground="#64748B" FontSize="11" FontWeight="Bold" Margin="14,18,12,6" />
+
+                        <!-- 7. Updates -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="Updates" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoDownloadCloud}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Software Updates" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="Updates">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <!-- 8. Settings -->
+                        <Button Command="{Binding SelectTabCommand}" CommandParameter="Settings" Cursor="Hand" Margin="0,2">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="ItemBorder" Background="Transparent" CornerRadius="8" Padding="12,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4" />
+                                                <ColumnDefinition Width="24" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border x:Name="AccentBar" Grid.Column="0" Background="{StaticResource BrandRed}" CornerRadius="2" Visibility="Collapsed" Margin="-8,0,0,0" />
+                                            <Path Grid.Column="1" Data="{StaticResource GeoSettings}" Stroke="#94A3B8" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" x:Name="IconPath" />
+                                            <TextBlock Grid.Column="2" Text="Settings" Foreground="#94A3B8" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" x:Name="LabelText" />
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHover}" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#F8FAFC" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#F8FAFC" />
+                                        </Trigger>
+                                        <DataTrigger Binding="{Binding ActiveTab}" Value="Settings">
+                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarActive}" />
+                                            <Setter TargetName="AccentBar" Property="Visibility" Value="Visible" />
+                                            <Setter TargetName="IconPath" Property="Stroke" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="Foreground" Value="#FFFFFF" />
+                                            <Setter TargetName="LabelText" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- BOTTOM OF SIDEBAR: SECAPPER Dynamic Version & Local State -->
+                <Border Grid.Row="2" BorderBrush="#163259" BorderThickness="0,1,0,0" Padding="20,16" Background="#0A1D38">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="SECAPPER" Foreground="#CBD5E1" FontSize="12" FontWeight="Bold" />
+                            <TextBlock Text=" · " Foreground="#64748B" FontSize="12" />
+                            <TextBlock Foreground="#94A3B8" FontSize="12">
+                                <Run Text="v" /><Run Text="{Binding CurrentAppVersion, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4,0,0">
+                            <Ellipse Width="6" Height="6" Fill="#10B981" Margin="0,0,6,0" VerticalAlignment="Center" />
+                            <TextBlock Text="Protected locally" Foreground="#10B981" FontSize="11" FontWeight="Medium" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ======================================================== -->
+        <!-- 2. MAIN CONTENT AREA                                    -->
+        <!-- ======================================================== -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <!-- Clean Top Header -->
+                <RowDefinition Height="Auto" />
+                <!-- Active Threat Alert Banner (if threat detected) -->
+                <RowDefinition Height="Auto" />
+                <!-- Dynamic Page View Canvas -->
+                <RowDefinition Height="*" />
+                <!-- Subtle Status Bar -->
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- TOP HEADER -->
+            <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1" Padding="32,18">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- Title & Subtitle -->
+                        <ColumnDefinition Width="*" />
+                        <!-- Security Status & Quick Icons -->
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding PageTitle, Mode=OneWay}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
+                        <TextBlock Text="{Binding PageSubtitle, Mode=OneWay}" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" />
+                    </StackPanel>
+
+                    <!-- Header Right: Security Status Indicator & Actions -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- System Protected Indicator Badge -->
+                        <Border Background="{Binding SystemSecurityStatusBadgeBackground, Mode=OneWay}"
+                                BorderBrush="{Binding SystemSecurityStatusBrush, Mode=OneWay}"
+                                BorderThickness="1"
+                                CornerRadius="20"
+                                Padding="14,6"
+                                Margin="0,0,16,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Ellipse Width="8" Height="8" Fill="{Binding SystemSecurityStatusBrush, Mode=OneWay}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding SystemSecurityStatusText, Mode=OneWay}"
+                                           Foreground="{Binding SystemSecurityStatusBrush, Mode=OneWay}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Refresh Status Button -->
+                        <Button Style="{StaticResource OutlineBtn}" Command="{Binding RefreshCommand}" ToolTip="Refresh security status and verify consistency" Width="38" Height="38" Padding="0" Margin="0,0,8,0">
+                            <Path Data="{StaticResource GeoRefresh}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="16" Height="16" />
+                        </Button>
+
+                        <!-- Settings Shortcut Button -->
+                        <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="Settings" ToolTip="SecApper Settings" Width="38" Height="38" Padding="0">
+                            <Path Data="{StaticResource GeoSettings}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="16" Height="16" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ACTIVE THREAT ALERT BANNER -->
+            <Border Grid.Row="1" Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="0,0,0,1" Padding="24,12" Visibility="{Binding HasActiveAlert, Converter={StaticResource BoolToVis}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Path Grid.Column="0" Data="{StaticResource GeoAlertTriangle}" Fill="#EF4444" Width="22" Height="22" VerticalAlignment="Center" Margin="0,0,14,0" />
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="CRITICAL SUSPICIOUS ACTIVITY DETECTED" Foreground="#991B1B" FontWeight="Bold" FontSize="13" />
+                        <TextBlock Foreground="#B91C1C" FontSize="12" Margin="0,2,0,0">
+                            <Run Text="Threat Score: " /><Run Text="{Binding ActiveAlert.ThreatScore, Mode=OneWay}" FontWeight="Bold" />
+                            <Run Text=" | Process: " /><Run Text="{Binding ActiveAlert.ProcessName, Mode=OneWay}" FontWeight="SemiBold" />
+                            <Run Text=" | Target: " /><Run Text="{Binding ActiveAlert.FolderPath, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="🚨 Panic Lock Folders" Style="{StaticResource BrandRedBtn}" Command="{Binding PanicLockCommand}" Margin="0,0,8,0" Height="34" />
+                        <Button Content="Dismiss" Style="{StaticResource OutlineBtn}" Command="{Binding DismissAlertCommand}" Height="34" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- DYNAMIC VIEW PAGES -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid Margin="32,24,32,32">
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 1: DASHBOARD                                    -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewDashboard">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="Dashboard">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Top Welcome & Security Status Hero Card -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20" Background="#FFFFFF">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <!-- Shield & State -->
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Large Shield Visual -->
+                                <Border Grid.Column="0" Background="#F0FDF4" CornerRadius="16" Width="68" Height="68" Margin="0,0,20,0" BorderBrush="#BBF7D0" BorderThickness="1">
+                                    <Path Data="{StaticResource GeoShieldCheck}" Fill="#16A34A" Width="36" Height="36" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="Your device is protected" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
+                                        <Border Background="{Binding SystemSecurityStatusBadgeBackground, Mode=OneWay}"
+                                                BorderBrush="{Binding SystemSecurityStatusBrush, Mode=OneWay}"
+                                                BorderThickness="1"
+                                                CornerRadius="12"
+                                                Padding="10,3"
+                                                Margin="12,0,0,0">
+                                            <TextBlock Text="{Binding SystemSecurityStatusText, Mode=OneWay}"
+                                                       Foreground="{Binding SystemSecurityStatusBrush, Mode=OneWay}"
+                                                       FontSize="11"
+                                                       FontWeight="Bold" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Your folders and security controls are managed locally on this device using native Windows permissions." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,10" />
+
+                                    <!-- Supporting Information Pills -->
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Background="#F1F5F9" CornerRadius="6" Padding="8,4" Margin="0,0,8,0">
+                                            <TextBlock Text="● Folder Locker: Active" Foreground="#334155" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                        <Border Background="#F1F5F9" CornerRadius="6" Padding="8,4" Margin="0,0,8,0">
+                                            <TextBlock Text="● Ransomware Protection: Active" Foreground="#334155" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                        <Border Background="#F1F5F9" CornerRadius="6" Padding="8,4">
+                                            <TextBlock Text="● Recovery System: Ready" Foreground="#334155" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Action on Hero Card -->
+                                <Button Grid.Column="2" Content="+ Protect Folder" Style="{StaticResource BrandRedBtn}" Command="{Binding AddFolderCommand}" VerticalAlignment="Center" Height="42" Padding="20,0" Effect="{StaticResource ButtonShadow}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Four Major Dashboard Security Cards -->
+                        <Grid Margin="0,0,0,24">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- CARD 1: Protected Folders -->
+                            <Border Grid.Column="0" Style="{StaticResource SecurityCard}" Padding="18">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <TextBlock Text="PROTECTED FOLDERS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                                        <Path Data="{StaticResource GeoFolderLock}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding TotalFoldersCount, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
+                                    <TextBlock Text="Folders currently protected" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
+                                    <Button Content="View Protected Folders" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- CARD 2: Locked Storage -->
+                            <Border Grid.Column="2" Style="{StaticResource SecurityCard}" Padding="18">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <TextBlock Text="LOCKED STORAGE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                                        <Path Data="{StaticResource GeoLock}" Stroke="{StaticResource BrandRed}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding TotalLockedStorageText, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Height="34" VerticalAlignment="Center" />
+                                    <TextBlock Text="Protected folder storage" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
+                                    <Button Content="Manage" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- CARD 3: Ransomware Protection -->
+                            <Border Grid.Column="4" Style="{StaticResource SecurityCard}" Padding="18">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <TextBlock Text="RANSOMWARE PROTECTION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                                        <Path Data="{StaticResource GeoShieldAlert}" Stroke="{StaticResource SuccessGreen}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <TextBlock Text="ACTIVE" FontSize="28" FontWeight="Bold" Foreground="{StaticResource SuccessGreen}" />
+                                    <TextBlock Text="Monitoring protected folders" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
+                                    <Button Content="Manage Protection" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="RansomwareProtection" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- CARD 4: Security Events -->
+                            <Border Grid.Column="6" Style="{StaticResource SecurityCard}" Padding="18">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,12">
+                                        <TextBlock Text="SECURITY EVENTS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                                        <Path Data="{StaticResource GeoActivity}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding SecurityEvents.Count, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
+                                    <TextBlock Text="Events detected offline" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
+                                    <Button Content="View Events" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="SecurityEvents" HorizontalAlignment="Stretch" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- QUICK ACTIONS SECTION -->
+                        <Border Style="{StaticResource SecurityCard}">
+                            <StackPanel>
+                                <TextBlock Text="Quick Actions" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16" />
+                                <WrapPanel>
+                                    <!-- 1. Add Folder (Primary Action with Red Accent) -->
+                                    <Button Style="{StaticResource BrandRedBtn}" Command="{Binding AddFolderCommand}" Margin="0,0,12,12" Height="40" Padding="18,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource GeoPlus}" Stroke="#FFFFFF" StrokeThickness="2" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="+ Add Folder" FontWeight="Bold" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 2. Lock Folder -->
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" Margin="0,0,12,12" Height="40">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource GeoLock}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Lock Folder" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 3. Unlock Folder -->
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Margin="0,0,12,12" Height="40">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource GeoUnlock}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Unlock Folder" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 4. Open Protected Folders -->
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Margin="0,0,12,12" Height="40">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource GeoFolder}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Open Protected Folders" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 5. Run Security Check -->
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding ScanRecoveryCommand}" Margin="0,0,12,12" Height="40">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource GeoRotateCcw}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="Run Security Check" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- 6. View Security Events -->
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="SecurityEvents" Margin="0,0,12,12" Height="40">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Path Data="{StaticResource GeoActivity}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <TextBlock Text="View Security Events" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 2: FOLDER LOCKER                                -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewFolderLocker">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="FolderLocker">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Primary Card: LOCK A FOLDER -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Header Area -->
+                                <StackPanel Grid.Row="0" Margin="0,0,0,20">
+                                    <TextBlock Text="LOCK A FOLDER" FontSize="16" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" />
+                                    <TextBlock Text="Select a folder to protect it from unauthorized access using Windows security permissions." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0" />
+                                </StackPanel>
+
+                                <!-- Interactive Selection Panel -->
+                                <Border Grid.Row="1" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="20" Margin="0,0,0,20">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="60" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0" Background="#EEF2F6" CornerRadius="10" Width="48" Height="48" HorizontalAlignment="Left">
+                                            <Path Data="{StaticResource GeoFolderLock}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,20,0">
+                                            <!-- If folder is selected -->
+                                            <StackPanel Visibility="{Binding HasSelectedLocker, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding SelectedLockerFolderName, Mode=OneWay}" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
+                                                    <Border Background="#F1F5F9" CornerRadius="6" Padding="8,2" Margin="10,0,0,0">
+                                                        <TextBlock Text="{Binding SelectedLockerStatusText, Mode=OneWay}" FontSize="11" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding SelectedLockerPath, Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                            </StackPanel>
+
+                                            <!-- If no folder selected yet -->
+                                            <StackPanel>
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasSelectedLocker}" Value="False">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
+                                                <TextBlock Text="No folder selected" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
+                                                <TextBlock Text="Choose any folder on your device to configure offline Windows access protection." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Content="+ Select Folder" Style="{StaticResource OutlineBtn}" Command="{Binding SelectFolderForLockerCommand}" Margin="0,0,10,0" Height="40" Padding="16,0" />
+
+                                            <!-- Action Button: LOCK or UNLOCK depending on state -->
+                                            <Button Content="LOCK FOLDER" Command="{Binding LockSelectedLockerCommand}" Height="40" Padding="20,0">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource BrandRedBtn}">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelectedLockerLocked}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+
+                                            <Button Content="UNLOCK FOLDER" Command="{Binding UnlockSelectedLockerCommand}" Height="40" Padding="20,0">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource NavyBtn}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelectedLockerLocked}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Clarification Notes -->
+                                <Border Grid.Row="2" Background="#F1F5F9" CornerRadius="8" Padding="16">
+                                    <StackPanel>
+                                        <TextBlock Text="IMPORTANT SECURITY GUARANTEES" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,6" />
+                                        <TextBlock Text="• Locking does NOT delete the folder or your files." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,1" />
+                                        <TextBlock Text="• Unlocking restores original Windows access permissions." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,1" />
+                                        <TextBlock Text="• The application uses native Windows security permissions (NTFS ACLs)." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,1" />
+                                        <TextBlock Text="• The locked folder icon is an indicator; access is restricted directly by the Windows filesystem." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,1" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Registered Folders Quick List -->
+                        <Border Style="{StaticResource SecurityCard}">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,16">
+                                    <TextBlock Text="Registered Protected Folders" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                                    <Button Content="Go to Full List" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" HorizontalAlignment="Right" Padding="12,5" FontSize="12" />
+                                </Grid>
+
+                                <ItemsControl ItemsSource="{Binding Folders}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="36" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Path Grid.Column="0" Data="{StaticResource GeoFolder}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" VerticalAlignment="Center" />
+
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding FolderName}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                                        <TextBlock Text="{Binding FolderPath}" FontSize="12" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                                    </StackPanel>
+
+                                                    <!-- Status Badge -->
+                                                    <Border Grid.Column="2" Background="{Binding StatusBadgeBackground}" CornerRadius="12" Padding="10,3" Margin="14,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBadgeForeground}" FontSize="11" FontWeight="Bold" />
+                                                    </Border>
+
+                                                    <!-- Toggle Action -->
+                                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Content="Unlock" Style="{StaticResource OutlineBtn}" Command="{Binding DataContext.UnlockFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" Height="32" Padding="12,0" />
+                                                        <Button Content="Lock" Style="{StaticResource BrandRedBtn}" Command="{Binding DataContext.LockFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Visibility="{Binding IsUnlocked, Converter={StaticResource BoolToVis}}" Height="32" Padding="14,0" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 3: PROTECTED FOLDERS                            -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewProtectedFolders">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="ProtectedFolders">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Toolbar -->
+                        <Grid Margin="0,0,0,16">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Manage Folders" FontSize="18" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                                <Border Background="#EEF2F6" CornerRadius="12" Padding="10,2" Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Foreground="{StaticResource BrandNavy}" FontSize="12" FontWeight="SemiBold">
+                                        <Run Text="{Binding TotalFoldersCount, Mode=OneWay}" /><Run Text=" protected" />
+                                    </TextBlock>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="+ Protect a Folder" Style="{StaticResource BrandRedBtn}" Command="{Binding AddFolderCommand}" Height="36" Padding="16,0" Margin="0,0,8,0" />
+                                <Button Content="Lock All" Style="{StaticResource OutlineBtn}" Command="{Binding LockAllCommand}" Height="36" Padding="14,0" Margin="0,0,8,0" />
+                                <Button Content="🚨 Panic Lock" Style="{StaticResource DangerOutlineBtn}" Command="{Binding PanicLockCommand}" Height="36" Padding="14,0" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Folders Table / List -->
+                        <Border Style="{StaticResource SecurityCard}" Padding="0">
+                            <Grid>
+                                <!-- Empty State -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40" Visibility="{Binding HasFolders, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasFolders}" Value="False">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Path Data="{StaticResource GeoFolderLock}" Stroke="#94A3B8" StrokeThickness="1.5" Fill="Transparent" Width="48" Height="48" HorizontalAlignment="Center" Margin="0,0,0,14" />
+                                    <TextBlock Text="No folders are currently protected." FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Protect your confidential folders from unauthorized local access and ransomware." FontSize="13" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,4,0,18" />
+                                    <Button Content="+ Protect a Folder" Style="{StaticResource BrandRedBtn}" Command="{Binding AddFolderCommand}" HorizontalAlignment="Center" Height="38" Padding="18,0" />
+                                </StackPanel>
+
+                                <!-- Table Content -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasFolders}" Value="False">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <!-- Table Header -->
+                                    <Border Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1" Padding="20,12" CornerRadius="12,12,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="3*" />
+                                                <ColumnDefinition Width="1.2*" />
+                                                <ColumnDefinition Width="1.2*" />
+                                                <ColumnDefinition Width="1.5*" />
+                                                <ColumnDefinition Width="2.2*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="FOLDER" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="1" Text="LOCATION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="2" Text="STATUS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="3" Text="PROTECTION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="4" Text="LAST ACTIVITY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="5" Text="ACTIONS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Table Rows -->
+                                    <ItemsControl ItemsSource="{Binding Folders}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1" Padding="20,14">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*" />
+                                                            <ColumnDefinition Width="3*" />
+                                                            <ColumnDefinition Width="1.2*" />
+                                                            <ColumnDefinition Width="1.2*" />
+                                                            <ColumnDefinition Width="1.5*" />
+                                                            <ColumnDefinition Width="2.2*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Folder Name -->
+                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Data="{StaticResource GeoFolder}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding FolderName}" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+
+                                                        <!-- Location -->
+                                                        <TextBlock Grid.Column="1" Text="{Binding FolderPath}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding FolderPath}" />
+
+                                                        <!-- Status Badge -->
+                                                        <Border Grid.Column="2" Background="{Binding StatusBadgeBackground}" CornerRadius="12" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding StatusText}" Foreground="{Binding StatusBadgeForeground}" FontSize="11" FontWeight="Bold" />
+                                                        </Border>
+
+                                                        <!-- Protection -->
+                                                        <Border Grid.Column="3" Background="#F1F5F9" CornerRadius="12" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ProtectionShortText}" Foreground="#334155" FontSize="11" FontWeight="SemiBold" />
+                                                        </Border>
+
+                                                        <!-- Last Activity -->
+                                                        <TextBlock Grid.Column="4" Text="{Binding LastActivityText}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+
+                                                        <!-- Actions -->
+                                                        <StackPanel Grid.Column="5" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                            <!-- Unlock / Lock Button -->
+                                                            <Button Content="Unlock" Style="{StaticResource OutlineBtn}" Command="{Binding DataContext.UnlockFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" Height="30" Padding="10,0" Margin="0,0,6,0" FontSize="12" />
+                                                            <Button Content="Lock" Style="{StaticResource BrandRedBtn}" Command="{Binding DataContext.LockFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Visibility="{Binding IsUnlocked, Converter={StaticResource BoolToVis}}" Height="30" Padding="12,0" Margin="0,0,6,0" FontSize="12" />
+
+                                                            <!-- Open in Explorer -->
+                                                            <Button Style="{StaticResource OutlineBtn}" Command="{Binding DataContext.OpenInExplorerCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="Open folder in Explorer" Width="30" Height="30" Padding="0" Margin="0,0,6,0">
+                                                                <Path Data="{StaticResource GeoExternalLink}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="13" Height="13" />
+                                                            </Button>
+
+                                                            <!-- Details -->
+                                                            <Button Style="{StaticResource OutlineBtn}" Command="{Binding DataContext.ViewDetailsCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="View Folder Security Details" Width="30" Height="30" Padding="0" Margin="0,0,6,0">
+                                                                <Path Data="{StaticResource GeoInfo}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="13" Height="13" />
+                                                            </Button>
+
+                                                            <!-- Remove from Protection -->
+                                                            <Button Style="{StaticResource DangerOutlineBtn}" Command="{Binding DataContext.RemoveFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" ToolTip="Remove from SecApper (does NOT delete files)" Width="30" Height="30" Padding="0">
+                                                                <Path Data="{StaticResource GeoTrash}" Stroke="{StaticResource BrandRed}" StrokeThickness="1.8" Fill="Transparent" Width="13" Height="13" />
+                                                            </Button>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 4: RANSOMWARE PROTECTION                        -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewRansomware">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="RansomwareProtection">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Large Status Card -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Margin="0,0,0,20">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Background="#F0FDF4" CornerRadius="12" Width="48" Height="48" Margin="0,0,16,0" BorderBrush="#BBF7D0" BorderThickness="1">
+                                            <Path Data="{StaticResource GeoShieldAlert}" Fill="#16A34A" Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="RANSOMWARE PROTECTION" FontSize="18" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" />
+                                                <Border Background="#DCFCE7" BorderBrush="#BBF7D0" BorderThickness="1" CornerRadius="12" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="ACTIVE" Foreground="#166534" FontSize="11" FontWeight="Bold" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="SecApper is actively monitoring registered folders for suspicious file activity." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- 4 Metrics Tiles -->
+                                <Grid Grid.Row="1" Margin="0,0,0,20">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Metric 1: Protected Folders -->
+                                    <Border Grid.Column="0" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Protected Folders" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="{Binding TotalFoldersCount, Mode=OneWay}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Metric 2: Monitoring -->
+                                    <Border Grid.Column="2" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Monitoring" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="Active" FontSize="24" FontWeight="Bold" Foreground="#16A34A" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Metric 3: Suspicious Events -->
+                                    <Border Grid.Column="4" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Suspicious Events" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="{Binding SuspiciousEventsCount, Mode=OneWay}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Metric 4: Threat Level -->
+                                    <Border Grid.Column="6" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="10" Padding="16">
+                                        <StackPanel>
+                                            <TextBlock Text="Threat Level" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="{Binding ThreatLevelText, Mode=OneWay}" FontSize="24" FontWeight="Bold" Foreground="{Binding ThreatLevelBadgeColor, Mode=OneWay}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Heuristic Safeguard Details -->
+                                <Border Grid.Row="2" Background="#F1F5F9" CornerRadius="8" Padding="16">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="✓ Real-time NTFS FileSystemWatcher heuristics active" FontSize="12" Foreground="#334155" Margin="0,2" />
+                                            <TextBlock Text="✓ Mass file modification heuristic threshold: 25 files/window" FontSize="12" Foreground="#334155" Margin="0,2" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="✓ Rapid renaming and unknown extension alteration guard active" FontSize="12" Foreground="#334155" Margin="0,2" />
+                                            <TextBlock Text="✓ Local cryptographic canary detection engine initialized" FontSize="12" Foreground="#334155" Margin="0,2" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Controls & Test Trigger Card -->
+                        <Border Style="{StaticResource SecurityCard}">
+                            <StackPanel>
+                                <TextBlock Text="Heuristic Testing &amp; Emergency Actions" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16" />
+                                <WrapPanel>
+                                    <Button Content="Run Heuristic Detection Test" Style="{StaticResource OutlineBtn}" Command="{Binding SimulateThreatAlertCommand}" Margin="0,0,12,12" Height="38" Padding="16,0" />
+                                    <Button Content="Lock All Folders Now" Style="{StaticResource NavyBtn}" Command="{Binding LockAllCommand}" Margin="0,0,12,12" Height="38" Padding="16,0" />
+                                    <Button Content="🚨 Activate Emergency Panic Lock" Style="{StaticResource BrandRedBtn}" Command="{Binding PanicLockCommand}" Margin="0,0,12,12" Height="38" Padding="18,0" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 5: SECURITY EVENTS                              -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewSecurityEvents">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="SecurityEvents">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Toolbar: Filter Chips + Search + Actions -->
+                        <Border Style="{StaticResource SecurityCard}" Padding="16" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Severity Filter Chips -->
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="All" Style="{StaticResource OutlineBtn}" Command="{Binding SetEventFilterCommand}" CommandParameter="ALL" Height="32" Padding="12,0" Margin="0,0,6,0" FontSize="12" />
+                                    <Button Content="Info" Style="{StaticResource OutlineBtn}" Command="{Binding SetEventFilterCommand}" CommandParameter="INFO" Height="32" Padding="12,0" Margin="0,0,6,0" FontSize="12" />
+                                    <Button Content="Warning" Style="{StaticResource OutlineBtn}" Command="{Binding SetEventFilterCommand}" CommandParameter="WARNING" Height="32" Padding="12,0" Margin="0,0,6,0" FontSize="12" />
+                                    <Button Content="Threat" Style="{StaticResource OutlineBtn}" Command="{Binding SetEventFilterCommand}" CommandParameter="THREAT" Height="32" Padding="12,0" Margin="0,0,6,0" FontSize="12" />
+                                    <Button Content="Critical" Style="{StaticResource OutlineBtn}" Command="{Binding SetEventFilterCommand}" CommandParameter="CRITICAL" Height="32" Padding="12,0" FontSize="12" />
+                                </StackPanel>
+
+                                <!-- Search Field -->
+                                <Border Grid.Column="1" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="10,0" Margin="16,0" Height="36">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Grid.Column="0" Data="{StaticResource GeoSearch}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" VerticalAlignment="Center" />
+                                        <TextBox Grid.Column="1" Text="{Binding EventSearchText, UpdateSourceTrigger=PropertyChanged}" Background="Transparent" BorderThickness="0" VerticalAlignment="Center" FontSize="13" Foreground="{StaticResource TextPrimary}" Margin="8,0,0,0" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Export & Clear Actions -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Export Logs" Style="{StaticResource OutlineBtn}" Command="{Binding ExportEventsCommand}" Height="34" Padding="14,0" Margin="0,0,8,0" FontSize="12" />
+                                    <Button Content="Clear Events" Style="{StaticResource OutlineBtn}" Command="{Binding ClearEventsCommand}" Height="34" Padding="14,0" FontSize="12" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Events Table -->
+                        <Border Style="{StaticResource SecurityCard}" Padding="0">
+                            <Grid>
+                                <!-- Empty state if no events -->
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="40">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FilteredEvents.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Path Data="{StaticResource GeoShieldCheck}" Stroke="#94A3B8" StrokeThickness="1.5" Fill="Transparent" Width="44" Height="44" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                                    <TextBlock Text="No security events detected." FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Protection is active. No matching security events recorded." FontSize="12" Foreground="{StaticResource TextSecondary}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <!-- Table Content -->
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FilteredEvents.Count}" Value="0">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <!-- Header -->
+                                    <Border Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1" Padding="20,12" CornerRadius="12,12,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="1.2*" />
+                                                <ColumnDefinition Width="2.5*" />
+                                                <ColumnDefinition Width="1.5*" />
+                                                <ColumnDefinition Width="1.5*" />
+                                                <ColumnDefinition Width="1.2*" />
+                                                <ColumnDefinition Width="2.5*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="TIME" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="1" Text="EVENT" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="2" Text="FOLDER" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="3" Text="PROCESS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="4" Text="SEVERITY" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Grid.Column="5" Text="ACTION TAKEN" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- List Rows -->
+                                    <ItemsControl ItemsSource="{Binding FilteredEvents}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource CardBorder}" BorderThickness="0,0,0,1" Padding="20,12">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.2*" />
+                                                            <ColumnDefinition Width="2.5*" />
+                                                            <ColumnDefinition Width="1.5*" />
+                                                            <ColumnDefinition Width="1.5*" />
+                                                            <ColumnDefinition Width="1.2*" />
+                                                            <ColumnDefinition Width="2.5*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <TextBlock Grid.Column="0" Text="{Binding TimeText}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding EventType}" FontWeight="SemiBold" FontSize="13" Foreground="{StaticResource TextPrimary}" />
+                                                            <TextBlock Text="{Binding Description}" FontSize="11" Foreground="{StaticResource TextSecondary}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding Description}" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="2" Text="{Binding FolderDisplay}" FontSize="12" Foreground="{StaticResource BrandNavy}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding ProcessName}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ProcessPath}" />
+
+                                                        <!-- Severity Badge -->
+                                                        <Border Grid.Column="4" Background="{Binding SeverityBadgeBackground}" CornerRadius="12" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding SeverityText}" Foreground="{Binding SeverityBadgeForeground}" FontSize="10" FontWeight="Bold" />
+                                                        </Border>
+
+                                                        <TextBlock Grid.Column="5" Text="{Binding ActionTaken}" FontSize="12" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding ActionTaken}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 6: RECOVERY CENTER                              -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewRecovery">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="Recovery">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Recovery Health Status Card -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Margin="0,0,0,20">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Background="#F0FDF4" CornerRadius="12" Width="48" Height="48" Margin="0,0,16,0" BorderBrush="#BBF7D0" BorderThickness="1">
+                                            <Path Data="{StaticResource GeoRotateCcw}" Fill="#16A34A" Width="24" Height="24" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="RECOVERY CENTER" FontSize="18" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" />
+                                                <Border Background="#DCFCE7" BorderBrush="#BBF7D0" BorderThickness="1" CornerRadius="12" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding RecoveryStatusText, Mode=OneWay}" Foreground="#166534" FontSize="11" FontWeight="Bold" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="Recover folder access and restore ACLs after interrupted security operations or unexpected power events." FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <Button Content="Run Recovery Check" Style="{StaticResource NavyBtn}" Command="{Binding ScanRecoveryCommand}" HorizontalAlignment="Right" VerticalAlignment="Center" Height="38" Padding="16,0" />
+                                </Grid>
+
+                                <!-- Status Indicators Grid -->
+                                <Grid Grid.Row="1" Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14">
+                                        <StackPanel>
+                                            <TextBlock Text="Database Status" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="SQLite Offline: OK" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="2" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14">
+                                        <StackPanel>
+                                            <TextBlock Text="Permission Backups" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="Synchronized &amp; Intact" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="4" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" CornerRadius="8" Padding="14">
+                                        <StackPanel>
+                                            <TextBlock Text="Last Recovery Scan" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                                            <TextBlock Text="{Binding LastRecoveryScanText, Mode=OneWay}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Safety Rule Notice -->
+                                <Border Grid.Row="2" Background="#F1F5F9" CornerRadius="8" Padding="14">
+                                    <TextBlock Text="SecApper never automatically overwrites unknown permissions. Recovery always preserves original NTFS security descriptors." FontSize="12" Foreground="#334155" />
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Inconsistencies List (if any) -->
+                        <Border Style="{StaticResource SecurityCard}" Visibility="{Binding HasRecoveryIssues, Converter={StaticResource BoolToVis}}">
+                            <StackPanel>
+                                <TextBlock Text="Detected Inconsistencies Requiring Action" FontSize="15" FontWeight="Bold" Foreground="{StaticResource BrandRed}" Margin="0,0,0,12" />
+                                <ItemsControl ItemsSource="{Binding RecoveryIssues}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#FEF2F2" BorderBrush="#FECDD3" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="{Binding Folder.FolderName}" FontWeight="Bold" FontSize="14" Foreground="#991B1B" />
+                                                        <TextBlock Text="{Binding Folder.FolderPath}" FontSize="12" Foreground="#B91C1C" Margin="0,2,0,0" />
+                                                        <TextBlock Text="{Binding Description}" FontSize="12" Foreground="#7F1D1D" Margin="0,4,0,0" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Content="Repair Protection" Style="{StaticResource BrandRedBtn}" Command="{Binding DataContext.RepairProtectionCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Height="34" Padding="12,0" Margin="0,0,8,0" />
+                                                        <Button Content="Restore Access" Style="{StaticResource OutlineBtn}" Command="{Binding DataContext.RestoreAccessCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Height="34" Padding="12,0" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 7: SOFTWARE UPDATES                             -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewUpdates">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="Updates">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- Main Version Card -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0" Margin="0,0,0,20">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Border Background="#EFF6FF" CornerRadius="12" Width="52" Height="52" Margin="0,0,16,0" BorderBrush="#BFDBFE" BorderThickness="1">
+                                            <Path Data="{StaticResource GeoDownloadCloud}" Fill="{StaticResource BrandNavy}" Width="26" Height="26" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <TextBlock Text="CURRENT VERSION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" />
+                                                <Border Background="#DCFCE7" CornerRadius="6" Padding="6,2" Margin="10,0,0,0">
+                                                    <TextBlock Text="STABLE" Foreground="#166534" FontSize="10" FontWeight="Bold" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,2,0,0">
+                                                <Run Text="v" /><Run Text="{Binding CurrentAppVersion, Mode=OneWay}" />
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding UpdateStatusMessage, Mode=OneWay}" FontSize="13" Foreground="{StaticResource TextSecondary}" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                        <Button Content="Check for Updates" Style="{StaticResource BrandRedBtn}" Command="{Binding CheckForUpdatesCommand}" Height="40" Padding="18,0" Margin="0,0,8,0" />
+                                        <Button Content="Simulate Update" Style="{StaticResource OutlineBtn}" Command="{Binding SimulateUpdateCommand}" Height="40" Padding="16,0" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <!-- Offline Notice -->
+                                <Border Grid.Row="1" Background="#F1F5F9" CornerRadius="8" Padding="16">
+                                    <TextBlock Text="SecApper is built offline-first. Even without internet connectivity, your protected folders, passwords, and ransomware detection remain 100% active and secure." FontSize="12" Foreground="#334155" />
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- Update Settings & Endpoint Card -->
+                        <Border Style="{StaticResource SecurityCard}">
+                            <StackPanel>
+                                <TextBlock Text="Update Configuration" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16" />
+
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Automatic Update Checks" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="Periodically check the official manifest for security patches." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding AutoCheckUpdates}" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Check Frequency" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="Frequency of background update queries." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding UpdateCheckFrequency}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource BrandNavy}" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Text="Update Manifest URL (Endpoint)" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,6" />
+                                    <TextBox Grid.Row="1" Text="{Binding UpdateManifestUrl, UpdateSourceTrigger=PropertyChanged}" Background="#F8FAFC" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" Padding="10,8" FontSize="13" Foreground="{StaticResource TextPrimary}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ==================================================== -->
+                    <!-- PAGE 8: SETTINGS                                     -->
+                    <!-- ==================================================== -->
+                    <StackPanel x:Name="ViewSettings">
+                        <StackPanel.Style>
+                            <Style TargetType="StackPanel">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ActiveTab}" Value="Settings">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </StackPanel.Style>
+
+                        <!-- General & System Integration -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <StackPanel>
+                                <TextBlock Text="GENERAL PREFERENCES" FontSize="12" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" Margin="0,0,0,16" />
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Windows Explorer Integration" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="Right-click context menu and double-click unlock prompt in Windows Explorer." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="{Binding ExplorerIntegrationEnabled}" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Minimize to System Tray" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="Keep background folder protection and double-click interception running in tray." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <CheckBox Grid.Column="1" IsChecked="True" IsEnabled="False" VerticalAlignment="Center" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Privacy & Security -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <StackPanel>
+                                <TextBlock Text="PRIVACY &amp; LOCAL SECURITY" FontSize="12" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" Margin="0,0,0,16" />
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Offline-Only Security Mode" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="All passwords, keys, folder permissions, and activity logs remain exclusively on your device." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="#DCFCE7" CornerRadius="12" Padding="8,3" VerticalAlignment="Center">
+                                        <TextBlock Text="ACTIVE" Foreground="#166534" FontSize="11" FontWeight="Bold" />
+                                    </Border>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Cloud Telemetry &amp; Analytics" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="SecApper transmits zero telemetry or folder metadata." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="#F1F5F9" CornerRadius="12" Padding="8,3" VerticalAlignment="Center">
+                                        <TextBlock Text="DISABLED" Foreground="#64748B" FontSize="11" FontWeight="Bold" />
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- About SecApper -->
+                        <Border Style="{StaticResource SecurityCard}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Official Logo in About -->
+                                <Border Grid.Column="0" Background="#FFFFFF" CornerRadius="12" Padding="12" BorderBrush="{StaticResource CardBorder}" BorderThickness="1" VerticalAlignment="Top" Margin="0,0,24,0" Effect="{StaticResource LogoShadow}">
+                                    <Image Source="pack://application:,,,/Resources/logo.png" Height="90" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="SecApper" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" />
+                                    <TextBlock Text="SECURE YOUR WORLD" FontSize="12" FontWeight="Bold" Foreground="{StaticResource BrandRed}" Margin="0,2,0,10" />
+                                    <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="13" LineHeight="20">
+                                        <Run Text="SecApper is a commercial-grade Windows 10/11 desktop application providing native NTFS filesystem access restriction, offline cryptographic key derivation, local SQLite storage, and active ransomware heuristic monitoring." />
+                                    </TextBlock>
+                                    <TextBlock FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,12,0,0">
+                                        <Run Text="Engine Version: " /><Run Text="{Binding CurrentAppVersion, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
+                                        <Run Text="  |  Platform: Windows x64 (NTFS ACL Engine)" />
+                                    </TextBlock>
+                                    <TextBlock Text="Copyright © SecApper. All rights reserved." FontSize="12" Foreground="#94A3B8" Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                </Grid>
+            </ScrollViewer>
+
+            <!-- SUBTLE BOTTOM STATUS BAR -->
+            <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="{StaticResource CardBorder}" BorderThickness="0,1,0,0" Padding="32,8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding StatusMessage, Mode=OneWay}" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Offline-First Engine" FontSize="11" Foreground="#94A3B8" Margin="0,0,12,0" />
+                        <Ellipse Width="6" Height="6" Fill="#10B981" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <TextBlock Text="Database Connected" FontSize="11" FontWeight="Medium" Foreground="#10B981" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>

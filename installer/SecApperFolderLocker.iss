@@ -2,7 +2,7 @@
 ; Offline Windows Folder Security & Ransomware Protection
 
 #define MyAppName "SecApper Folder Locker"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "SecApper Cybersecurity"
 #define MyAppExeName "SecApper.FolderLocker.exe"
 #define MyAppAssocName "SecApper Protected Folder"
@@ -26,12 +26,14 @@ PrivilegesRequiredOverridesAllowed=dialog
 DisableDirPage=no
 DisableProgramGroupPage=no
 ArchitecturesInstallIn64BitMode=x64
+CloseApplications=yes
+CloseApplicationsFilter=*.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 Name: "explorermenu"; Description: "Add 'Lock with SecApper' to Windows Explorer context menu"; GroupDescription: "Windows Explorer Integration:"
 
 [Files]
@@ -39,9 +41,9 @@ Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cr
 Source: "..\src\SecApper.FolderLocker\Resources\app.ico"; DestDir: "{commonappdata}\SecApper\FolderLocker\icons"; DestName: "locked.ico"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
-Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{group}\{cm:UninstallProgram,{#MyAppName}}"; Filename: "{uninstallexe}"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Registry]
 ; Windows Explorer context menu integration
@@ -50,7 +52,7 @@ Root: HKCU; Subkey: "Software\Classes\Directory\shell\SecApperFolderLocker"; Val
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\SecApperFolderLocker\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: explorermenu
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 // Safety check on uninstall to ensure user does not inadvertently leave protected folders without unlocking

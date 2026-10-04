@@ -28,6 +28,12 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
+    <Product>SecApper Folder Locker</Product>
+    <Company>SecApper Cybersecurity</Company>
+    <Description>Commercial-grade Windows folder security and ransomware protection.</Description>
   </PropertyGroup>
 
 </Project>

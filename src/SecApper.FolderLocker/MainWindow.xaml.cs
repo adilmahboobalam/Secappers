@@ -5,6 +5,7 @@ using System.Linq;
 using System.Windows;
 using SecApper.FolderLocker.Services;
 using SecApper.FolderLocker.ViewModels;
+using SecApper.FolderLocker.Views;
 using SecApper.Security.Data;
 using SecApper.Security.Models;
 using SecApper.Security.Ransomware;
@@ -30,10 +31,11 @@ public partial class MainWindow : Window
         // Instantiate services
         _db = new SqliteDatabaseService();
         var passwordService = new PasswordService();
+        var masterPinService = new MasterPinService(_db, passwordService);
         var aclService = new AclService();
         var backupService = new PermissionBackupService(aclService, _db);
         var iconService = new FolderIconService();
-        var lockService = new FolderLockService(_db, aclService, backupService, passwordService, iconService);
+        var lockService = new FolderLockService(_db, aclService, backupService, passwordService, iconService, masterPinService);
         var recoveryService = new RecoveryService(_db, aclService, iconService);
         var threatScorer = new ThreatScoringService();
         var processMonitor = new ProcessMonitorService();
@@ -61,7 +63,8 @@ public partial class MainWindow : Window
             passwordService,
             explorerService,
             _trayService,
-            updateService);
+            updateService,
+            masterPinService);
 
         DataContext = _viewModel;
 
@@ -81,6 +84,24 @@ public partial class MainWindow : Window
 
         Loaded += async (s, e) =>
         {
+            // Prompt for Master PIN setup on fresh installation if not yet configured
+            if (!await masterPinService.IsMasterPinConfiguredAsync())
+            {
+                var setupDialog = new SetupMasterPinDialog(masterPinService)
+                {
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+
+                bool? setupResult = setupDialog.ShowDialog();
+                if (setupResult != true && !await masterPinService.IsMasterPinConfiguredAsync())
+                {
+                    _isExplicitExit = true;
+                    System.Windows.Application.Current.Shutdown();
+                    return;
+                }
+            }
+
             await _viewModel.InitializeAsync();
             _accessMonitor.Start();
 

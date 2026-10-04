@@ -32,6 +32,7 @@ public class MainViewModel : ViewModelBase
     private readonly IExplorerIntegrationService _explorerService;
     private readonly SystemTrayService _trayService;
     private readonly IUpdateService _updateService;
+    private readonly IMasterPinService _masterPinService;
 
     private string _activeTab = "Dashboard";
     private bool _isBusy;
@@ -323,6 +324,7 @@ public class MainViewModel : ViewModelBase
     public ICommand SetEventFilterCommand { get; }
     public ICommand ExportEventsCommand { get; }
     public ICommand SimulateThreatAlertCommand { get; }
+    public ICommand ChangeMasterPinCommand { get; }
 
     public MainViewModel(
         IDatabaseService databaseService,
@@ -333,7 +335,8 @@ public class MainViewModel : ViewModelBase
         IPasswordService passwordService,
         IExplorerIntegrationService explorerService,
         SystemTrayService trayService,
-        IUpdateService updateService)
+        IUpdateService updateService,
+        IMasterPinService? masterPinService = null)
     {
         _databaseService = databaseService;
         _folderLockService = folderLockService;
@@ -344,6 +347,7 @@ public class MainViewModel : ViewModelBase
         _explorerService = explorerService;
         _trayService = trayService;
         _updateService = updateService;
+        _masterPinService = masterPinService ?? new MasterPinService(_databaseService, _passwordService);
 
         _explorerIntegrationEnabled = _explorerService.IsContextMenuEnabled();
 
@@ -379,6 +383,7 @@ public class MainViewModel : ViewModelBase
         SetEventFilterCommand = new RelayCommand(f => EventFilter = f?.ToString() ?? "ALL");
         ExportEventsCommand = new RelayCommand(ExecuteExportEvents);
         SimulateThreatAlertCommand = new AsyncRelayCommand(ExecuteSimulateThreatAlertAsync);
+        ChangeMasterPinCommand = new RelayCommand(ExecuteChangeMasterPin);
     }
 
     public async Task InitializeAsync()
@@ -620,7 +625,11 @@ public class MainViewModel : ViewModelBase
             if (folder == null) return "Folder record not found.";
             if (!_passwordService.VerifyPassword(pwd, folder.PasswordHash, folder.PasswordSalt, folder.PasswordAlgorithm, folder.PasswordIterations))
             {
-                return "Incorrect password.";
+                if (await _masterPinService.VerifyMasterPinAsync(pwd))
+                {
+                    return null;
+                }
+                return "Incorrect password or Master PIN.";
             }
             return null;
         };
@@ -680,7 +689,11 @@ public class MainViewModel : ViewModelBase
             await Task.Yield();
             if (!_passwordService.VerifyPassword(pwd, folder.PasswordHash, folder.PasswordSalt, folder.PasswordAlgorithm, folder.PasswordIterations))
             {
-                return "Incorrect password.";
+                if (await _masterPinService.VerifyMasterPinAsync(pwd))
+                {
+                    return null;
+                }
+                return "Incorrect password or Master PIN.";
             }
             return null;
         };
@@ -1322,6 +1335,19 @@ public class MainViewModel : ViewModelBase
         finally
         {
             IsCheckingForUpdates = false;
+        }
+    }
+
+    private void ExecuteChangeMasterPin()
+    {
+        var dialog = new ChangeMasterPinDialog(_masterPinService)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            MessageBox.Show("Master PIN has been updated successfully.", "Master PIN Changed", MessageBoxButton.OK, MessageBoxImage.Information);
+            StatusMessage = "Master PIN updated successfully.";
         }
     }
 }

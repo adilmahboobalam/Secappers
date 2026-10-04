@@ -51,6 +51,10 @@
                 <PasswordBox x:Name="ConfirmPwdBox" PasswordChanged="ConfirmPwdBox_PasswordChanged" BorderThickness="0" Background="Transparent" Padding="10,8" FontSize="14" />
             </Border>
 
+            <Border Background="#F1F5F9" CornerRadius="6" Padding="10,6" Margin="0,4,0,0">
+                <TextBlock Text="💡 Note: Your installation Master PIN can also unlock this folder anytime." FontSize="11" Foreground="#475569" />
+            </Border>
+
             <TextBlock x:Name="ErrorText" Foreground="#C5202B" FontSize="12" Margin="0,8,0,0" Visibility="Collapsed" FontWeight="SemiBold" />
         </StackPanel>
 

@@ -1654,6 +1654,36 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Master Security PIN -->
+                        <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
+                            <StackPanel>
+                                <TextBlock Text="MASTER ADMINISTRATIVE PIN" FontSize="12" FontWeight="Bold" Foreground="{StaticResource BrandNavy}" Margin="0,0,0,16" />
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                        <TextBlock Text="Master Security PIN Protection" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource TextPrimary}" />
+                                        <TextBlock Text="Your installation's master PIN can unlock any folder and authorize administrative security actions." FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Change Master PIN" Command="{Binding ChangeMasterPinCommand}" Style="{StaticResource OutlineBtn}" FontWeight="Bold" Padding="16,8" VerticalAlignment="Center" Cursor="Hand" />
+                                </Grid>
+
+                                <Border Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Grid.Column="0" Data="{StaticResource GeoShield}" Stroke="#1E40AF" StrokeThickness="1.8" Fill="Transparent" Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        <TextBlock Grid.Column="1" Text="Protected with PBKDF2-SHA256 (310,000 iterations &amp; cryptographic salt) stored locally." FontSize="11" Foreground="#475569" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Privacy & Security -->
                         <Border Style="{StaticResource SecurityCard}" Margin="0,0,0,20">
                             <StackPanel>

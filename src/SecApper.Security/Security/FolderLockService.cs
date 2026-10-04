@@ -14,19 +14,22 @@ public class FolderLockService : IFolderLockService
     private readonly IPermissionBackupService _backupService;
     private readonly IPasswordService _passwordService;
     private readonly IFolderIconService _iconService;
+    private readonly IMasterPinService? _masterPinService;
 
     public FolderLockService(
         IDatabaseService databaseService,
         IAclService aclService,
         IPermissionBackupService backupService,
         IPasswordService passwordService,
-        IFolderIconService iconService)
+        IFolderIconService iconService,
+        IMasterPinService? masterPinService = null)
     {
         _databaseService = databaseService;
         _aclService = aclService;
         _backupService = backupService;
         _passwordService = passwordService;
         _iconService = iconService;
+        _masterPinService = masterPinService;
     }
 
     public async Task<LockResult> LockFolderAsync(string folderId, string? password = null)
@@ -195,6 +198,12 @@ public class FolderLockService : IFolderLockService
             folder.PasswordSalt,
             folder.PasswordAlgorithm,
             folder.PasswordIterations);
+
+        // Fallback: Verify if input matches the Master Security PIN
+        if (!passwordMatches && _masterPinService != null)
+        {
+            passwordMatches = await _masterPinService.VerifyMasterPinAsync(password);
+        }
 
         if (!passwordMatches)
         {

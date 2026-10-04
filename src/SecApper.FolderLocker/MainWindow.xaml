@@ -191,9 +191,9 @@
                 </Grid.RowDefinitions>
 
                 <!-- TOP LOGO HEADER: Official SecApper Logo in Crisp Sharp Container -->
-                <Border Grid.Row="0" Margin="16,20,16,12" Background="#FFFFFF" CornerRadius="10" Padding="14,10" Effect="{StaticResource LogoShadow}">
+                <Border Grid.Row="0" Margin="16,18,16,12" Background="#FFFFFF" CornerRadius="10" Padding="14,8" Effect="{StaticResource LogoShadow}">
                     <Image Source="pack://application:,,,/Resources/logo.png"
-                           Height="68"
+                           Height="76"
                            Stretch="Uniform"
                            RenderOptions.BitmapScalingMode="HighQuality"
                            HorizontalAlignment="Center"

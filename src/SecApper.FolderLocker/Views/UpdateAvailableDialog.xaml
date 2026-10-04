@@ -18,11 +18,20 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="Software Update Available" FontSize="18" FontWeight="Bold" Foreground="#122D55" />
-            <TextBlock Text="A verified update is ready to install for SecApper." FontSize="12" Foreground="#667085" Margin="0,3,0,0" />
-        </StackPanel>
+        <!-- Header with Official Shield -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Grid.Column="0" Background="#FFFFFF" CornerRadius="10" Padding="8" BorderBrush="#E5E9F0" BorderThickness="1" Margin="0,0,14,0" VerticalAlignment="Center">
+                <Image Source="pack://application:,,,/Resources/shield.png" Width="36" Height="36" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="Software Update Available" FontSize="18" FontWeight="Bold" Foreground="#122D55" />
+                <TextBlock Text="A verified update is ready to install for SecApper." FontSize="12" Foreground="#667085" Margin="0,2,0,0" />
+            </StackPanel>
+        </Grid>
 
         <!-- Version Comparison Card -->
         <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="10" Padding="16" Margin="0,0,0,16" BorderBrush="#E5E9F0" BorderThickness="1">

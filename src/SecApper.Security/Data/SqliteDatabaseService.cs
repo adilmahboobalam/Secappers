@@ -279,7 +279,7 @@ public class SqliteDatabaseService : IDatabaseService
                 INSERT OR IGNORE INTO AppSettings (Key, Value, UpdatedAt) VALUES
                     ('AutoCheckUpdates', 'true', datetime('now')),
                     ('UpdateCheckFrequency', 'Daily', datetime('now')),
-                    ('UpdateManifestUrl', 'https://updates.secapper.com/secapper/stable/latest.json', datetime('now')),
+                    ('UpdateManifestUrl', 'https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json', datetime('now')),
                     ('LastUpdateCheckTime', '', datetime('now'));
             ";
             await cmd2.ExecuteNonQueryAsync();

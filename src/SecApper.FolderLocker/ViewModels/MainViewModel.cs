@@ -283,7 +283,7 @@ public class MainViewModel : ViewModelBase
     public bool HasFolders => Folders.Count > 0;
     public bool HasRecoveryIssues => RecoveryIssues.Count > 0;
 
-    private string _updateManifestUrl = "https://updates.secapper.com/secapper/stable/latest.json";
+    private string _updateManifestUrl = "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json";
     public string UpdateManifestUrl
     {
         get => _updateManifestUrl;
@@ -1235,8 +1235,8 @@ public class MainViewModel : ViewModelBase
             _updateCheckFrequency = await _databaseService.GetSettingAsync("UpdateCheckFrequency", "Daily") ?? "Daily";
             OnPropertyChanged(nameof(UpdateCheckFrequency));
 
-            _updateManifestUrl = await _databaseService.GetSettingAsync("UpdateManifestUrl", "https://updates.secapper.com/secapper/stable/latest.json")
-                ?? "https://updates.secapper.com/secapper/stable/latest.json";
+            _updateManifestUrl = await _databaseService.GetSettingAsync("UpdateManifestUrl", "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json")
+                ?? "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json";
             OnPropertyChanged(nameof(UpdateManifestUrl));
 
             string? last = await _databaseService.GetSettingAsync("LastUpdateCheckTime");

@@ -14,10 +14,17 @@ namespace SecApper.Security.Updates;
 
 public class UpdateService : IUpdateService
 {
-    private static readonly HttpClient HttpClient = new()
+    private static readonly HttpClient HttpClient = CreateHttpClient();
+
+    private static HttpClient CreateHttpClient()
     {
-        Timeout = TimeSpan.FromSeconds(30)
-    };
+        var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("SecApper-Updater/1.1.0 (Windows NT 10.0; Win64; x64)");
+        return client;
+    }
 
     private readonly IDatabaseService _databaseService;
     private readonly string _currentVersion;
@@ -77,7 +84,7 @@ public class UpdateService : IUpdateService
                 string programDataManifest = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "SecApper", "FolderLocker", "updates", "latest.json");
                 if (File.Exists(localManifest)) manifestUrl = new Uri(localManifest).AbsoluteUri;
                 else if (File.Exists(programDataManifest)) manifestUrl = new Uri(programDataManifest).AbsoluteUri;
-                else manifestUrl = "https://updates.secapper.com/secapper/stable/latest.json";
+                else manifestUrl = "https://raw.githubusercontent.com/adilmahboobalam/Secappers/main/latest.json";
             }
 
             string json;
@@ -105,20 +112,17 @@ public class UpdateService : IUpdateService
                 try
                 {
                     using var response = await HttpClient.GetAsync(uri, HttpCompletionOption.ResponseContentRead, ct);
+                    if (response.StatusCode == System.Net.HttpStatusCode.NotFound && uri.Host.Contains("github", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new UpdateCheckResult(false, null, _currentVersion,
+                            "Remote manifest not found on GitHub (404):\n\n" +
+                            "If your GitHub repository 'adilmahboobalam/Secappers' is set to Private, please change repository visibility to Public in GitHub Settings (or upload latest.json and setup exe to a public GitHub Release) so SecApper clients can query and install live updates.");
+                    }
                     response.EnsureSuccessStatusCode();
                     json = await response.Content.ReadAsStringAsync(ct);
                 }
                 catch (HttpRequestException ex)
                 {
-                    if (uri.Host.Contains("secapper.com", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return new UpdateCheckResult(false, null, _currentVersion, 
-                            "The default update server (updates.secapper.com) is currently offline.\n\n" +
-                            "To test live updates:\n" +
-                            "• Set your custom update server URL in Settings → Updates\n" +
-                            "• Or click '🚀 Simulate Live Update' in Settings to test the full live download and install workflow!");
-                    }
-
                     return new UpdateCheckResult(false, null, _currentVersion, $"Update check failed: Internet connection or update server unavailable ({ex.Message}).");
                 }
             }

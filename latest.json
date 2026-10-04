@@ -2,7 +2,7 @@
   "version": "1.1.0",
   "releaseDate": "2026-10-04",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/releases/download/v1.1.0/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "b592bbb5a860e987c5bdee77c963f8d32507eb8a9867310ec203d243eeb8720c",
+  "sha256": "bc761b3477952535b0f01f3ca1c24d670fca87a8e61d94974b51ab340758ff55",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
   "releaseNotes": "SecApper v1.1.0 Major Release:\n• Active double-click Windows Explorer unlock popup\n• Native NTFS Discretionary Access Control enforcement\n• Operation journal crash recovery\n• Background ransomware threat protection\n• Standalone zero-downtime auto-updater\n• Commercial cybersecurity GUI with official branding"

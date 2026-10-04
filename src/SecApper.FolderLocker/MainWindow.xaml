@@ -54,6 +54,13 @@
         <StreamGeometry x:Key="GeoExternalLink">M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6 M15 3h6v6 M10 14L21 3</StreamGeometry>
         <StreamGeometry x:Key="GeoTrash">M3 6h18 M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2</StreamGeometry>
 
+        <!-- Vector Icon Crisp Rendering Style -->
+        <Style TargetType="Path">
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+        </Style>
+
         <!-- Primary Red Button Style -->
         <Style x:Key="BrandRedBtn" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource BrandRed}" />
@@ -628,9 +635,9 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Large Shield Visual -->
-                                <Border Grid.Column="0" Background="#F0FDF4" CornerRadius="16" Width="68" Height="68" Margin="0,0,20,0" BorderBrush="#BBF7D0" BorderThickness="1">
-                                    <Path Data="{StaticResource GeoShieldCheck}" Fill="#16A34A" Width="36" Height="36" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <!-- Large Shield Visual: Official SecApper Shield -->
+                                <Border Grid.Column="0" Background="#FFFFFF" CornerRadius="16" Width="68" Height="68" Margin="0,0,20,0" BorderBrush="#E2E8F0" BorderThickness="1" Effect="{StaticResource LogoShadow}">
+                                    <Image Source="pack://application:,,,/Resources/shield.png" Width="44" Height="44" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Border>
 
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -686,7 +693,9 @@
                                 <StackPanel>
                                     <Grid Margin="0,0,0,12">
                                         <TextBlock Text="PROTECTED FOLDERS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
-                                        <Path Data="{StaticResource GeoFolderLock}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                        <Border Width="38" Height="38" CornerRadius="8" Background="#EFF6FF" BorderBrush="#DBEAFE" BorderThickness="1" HorizontalAlignment="Right">
+                                            <Path Data="{StaticResource GeoFolder}" Stroke="#1D4ED8" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                     <TextBlock Text="{Binding TotalFoldersCount, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
                                     <TextBlock Text="Folders currently protected" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
@@ -699,11 +708,13 @@
                                 <StackPanel>
                                     <Grid Margin="0,0,0,12">
                                         <TextBlock Text="LOCKED STORAGE" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
-                                        <Path Data="{StaticResource GeoLock}" Stroke="{StaticResource BrandRed}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                        <Border Width="38" Height="38" CornerRadius="8" Background="#FEF2F2" BorderBrush="#FEE2E2" BorderThickness="1" HorizontalAlignment="Right">
+                                            <Path Data="{StaticResource GeoLock}" Stroke="{StaticResource BrandRed}" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                     <TextBlock Text="{Binding TotalLockedStorageText, Mode=OneWay}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Height="34" VerticalAlignment="Center" />
                                     <TextBlock Text="Protected folder storage" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
-                                    <Button Content="Manage" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" HorizontalAlignment="Stretch" />
+                                    <Button Content="Manage Storage" Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" HorizontalAlignment="Stretch" />
                                 </StackPanel>
                             </Border>
 
@@ -712,7 +723,9 @@
                                 <StackPanel>
                                     <Grid Margin="0,0,0,12">
                                         <TextBlock Text="RANSOMWARE PROTECTION" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
-                                        <Path Data="{StaticResource GeoShieldAlert}" Stroke="{StaticResource SuccessGreen}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                        <Border Width="38" Height="38" CornerRadius="8" Background="#F0FDF4" BorderBrush="#DCFCE7" BorderThickness="1" HorizontalAlignment="Right">
+                                            <Path Data="{StaticResource GeoShieldAlert}" Stroke="{StaticResource SuccessGreen}" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                     <TextBlock Text="ACTIVE" FontSize="28" FontWeight="Bold" Foreground="{StaticResource SuccessGreen}" />
                                     <TextBlock Text="Monitoring protected folders" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
@@ -725,7 +738,9 @@
                                 <StackPanel>
                                     <Grid Margin="0,0,0,12">
                                         <TextBlock Text="SECURITY EVENTS" FontSize="11" FontWeight="Bold" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
-                                        <Path Data="{StaticResource GeoActivity}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" Fill="Transparent" Width="18" Height="18" HorizontalAlignment="Right" />
+                                        <Border Width="38" Height="38" CornerRadius="8" Background="#F8FAFC" BorderBrush="#E2E8F0" BorderThickness="1" HorizontalAlignment="Right">
+                                            <Path Data="{StaticResource GeoActivity}" Stroke="{StaticResource BrandNavy}" StrokeThickness="2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
                                     </Grid>
                                     <TextBlock Text="{Binding SecurityEvents.Count, Mode=OneWay}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" />
                                     <TextBlock Text="Events detected offline" FontSize="12" Foreground="{StaticResource TextSecondary}" Margin="0,2,0,16" />
@@ -739,51 +754,61 @@
                             <StackPanel>
                                 <TextBlock Text="Quick Actions" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" Margin="0,0,0,16" />
                                 <WrapPanel>
-                                    <!-- 1. Add Folder (Primary Action with Red Accent) -->
-                                    <Button Style="{StaticResource BrandRedBtn}" Command="{Binding AddFolderCommand}" Margin="0,0,12,12" Height="40" Padding="18,0">
+                                    <!-- 1. Add Folder (Primary Action) -->
+                                    <Button Style="{StaticResource BrandRedBtn}" Command="{Binding AddFolderCommand}" Margin="0,0,12,12" Height="42" Padding="20,0" Effect="{StaticResource ButtonShadow}">
                                         <StackPanel Orientation="Horizontal">
-                                            <Path Data="{StaticResource GeoPlus}" Stroke="#FFFFFF" StrokeThickness="2" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                            <Path Data="{StaticResource GeoPlus}" Stroke="#FFFFFF" StrokeThickness="2.2" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
                                             <TextBlock Text="+ Add Folder" FontWeight="Bold" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </Button>
 
                                     <!-- 2. Lock Folder -->
-                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" Margin="0,0,12,12" Height="40">
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="FolderLocker" Margin="0,0,12,12" Height="42" Padding="16,0">
                                         <StackPanel Orientation="Horizontal">
-                                            <Path Data="{StaticResource GeoLock}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Lock Folder" VerticalAlignment="Center" />
+                                            <Border Width="26" Height="26" CornerRadius="6" Background="#FEF2F2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Path Data="{StaticResource GeoLock}" Stroke="{StaticResource BrandRed}" StrokeThickness="1.8" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Text="Lock Folder" VerticalAlignment="Center" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Button>
 
                                     <!-- 3. Unlock Folder -->
-                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Margin="0,0,12,12" Height="40">
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Margin="0,0,12,12" Height="42" Padding="16,0">
                                         <StackPanel Orientation="Horizontal">
-                                            <Path Data="{StaticResource GeoUnlock}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Unlock Folder" VerticalAlignment="Center" />
+                                            <Border Width="26" Height="26" CornerRadius="6" Background="#F0FDF4" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Path Data="{StaticResource GeoUnlock}" Stroke="{StaticResource SuccessGreen}" StrokeThickness="1.8" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Text="Unlock Folder" VerticalAlignment="Center" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Button>
 
                                     <!-- 4. Open Protected Folders -->
-                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Margin="0,0,12,12" Height="40">
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="ProtectedFolders" Margin="0,0,12,12" Height="42" Padding="16,0">
                                         <StackPanel Orientation="Horizontal">
-                                            <Path Data="{StaticResource GeoFolder}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Open Protected Folders" VerticalAlignment="Center" />
+                                            <Border Width="26" Height="26" CornerRadius="6" Background="#EFF6FF" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Path Data="{StaticResource GeoFolder}" Stroke="#1D4ED8" StrokeThickness="1.8" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Text="Open Protected Folders" VerticalAlignment="Center" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Button>
 
                                     <!-- 5. Run Security Check -->
-                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding ScanRecoveryCommand}" Margin="0,0,12,12" Height="40">
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding ScanRecoveryCommand}" Margin="0,0,12,12" Height="42" Padding="16,0">
                                         <StackPanel Orientation="Horizontal">
-                                            <Path Data="{StaticResource GeoRotateCcw}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="Run Security Check" VerticalAlignment="Center" />
+                                            <Border Width="26" Height="26" CornerRadius="6" Background="#FFFBEB" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Path Data="{StaticResource GeoRotateCcw}" Stroke="{StaticResource WarningAmber}" StrokeThickness="1.8" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Text="Run Security Check" VerticalAlignment="Center" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Button>
 
                                     <!-- 6. View Security Events -->
-                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="SecurityEvents" Margin="0,0,12,12" Height="40">
+                                    <Button Style="{StaticResource OutlineBtn}" Command="{Binding SelectTabCommand}" CommandParameter="SecurityEvents" Margin="0,0,12,12" Height="42" Padding="16,0">
                                         <StackPanel Orientation="Horizontal">
-                                            <Path Data="{StaticResource GeoActivity}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.8" Fill="Transparent" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" />
-                                            <TextBlock Text="View Security Events" VerticalAlignment="Center" />
+                                            <Border Width="26" Height="26" CornerRadius="6" Background="#F1F5F9" Margin="0,0,8,0" VerticalAlignment="Center">
+                                                <Path Data="{StaticResource GeoActivity}" Stroke="{StaticResource BrandNavy}" StrokeThickness="1.8" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Fill="Transparent" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock Text="View Security Events" VerticalAlignment="Center" FontWeight="SemiBold" />
                                         </StackPanel>
                                     </Button>
                                 </WrapPanel>

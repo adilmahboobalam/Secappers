@@ -11,6 +11,11 @@ namespace SecApper.FolderLocker;
 /// </summary>
 public partial class App : System.Windows.Application
 {
+    private static System.Threading.Mutex? _singleInstanceMutex;
+    private static System.Threading.EventWaitHandle? _showWindowEvent;
+    private const string MutexName = "SecApperFolderLockerSingleInstanceMutex";
+    private const string EventName = "SecApperShowMainWindowEvent";
+
     public App()
     {
         DispatcherUnhandledException += App_DispatcherUnhandledException;
@@ -20,7 +25,64 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        _singleInstanceMutex = new System.Threading.Mutex(true, MutexName, out bool isFirstInstance);
+        if (!isFirstInstance)
+        {
+            // Signal the already running instance (in tray or background) to show its window
+            try
+            {
+                using var showEvent = System.Threading.EventWaitHandle.OpenExisting(EventName);
+                showEvent.Set();
+            }
+            catch
+            {
+            }
+
+            Shutdown();
+            return;
+        }
+
+        // Setup the event wait handle for future instances to signal us
+        try
+        {
+            _showWindowEvent = new System.Threading.EventWaitHandle(false, System.Threading.EventResetMode.AutoReset, EventName);
+            Task.Run(() =>
+            {
+                while (_showWindowEvent != null)
+                {
+                    try
+                    {
+                        _showWindowEvent.WaitOne();
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (MainWindow != null)
+                            {
+                                MainWindow.Show();
+                                MainWindow.WindowState = WindowState.Normal;
+                                MainWindow.Activate();
+                            }
+                        });
+                    }
+                    catch
+                    {
+                        break;
+                    }
+                }
+            });
+        }
+        catch
+        {
+        }
+
         base.OnStartup(e);
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try { _showWindowEvent?.Dispose(); } catch { }
+        try { _singleInstanceMutex?.ReleaseMutex(); } catch { }
+        try { _singleInstanceMutex?.Dispose(); } catch { }
+        base.OnExit(e);
     }
 
     private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

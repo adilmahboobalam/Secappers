@@ -8,8 +8,8 @@ namespace SecApper.Security.Security;
 
 public class AclService : IAclService
 {
-    // The exact permissions denied during lock: blocks all content reading, directory enumeration, writing, execution, and deletion,
-    // while deliberately preserving ChangePermissions & ReadPermissions so the authorized owner/service can unlock the folder.
+    // The exact permissions denied during lock: blocks all content reading, directory enumeration, writing, execution, deletion,
+    // and permission modification (ChangePermissions) so neither standard users nor Windows Explorer prompts can bypass the lock.
     public const FileSystemRights LockedDeniedRights = 
         FileSystemRights.ReadAndExecute | 
         FileSystemRights.Modify | 
@@ -17,7 +17,8 @@ public class AclService : IAclService
         FileSystemRights.CreateFiles | 
         FileSystemRights.CreateDirectories | 
         FileSystemRights.Delete | 
-        FileSystemRights.DeleteSubdirectoriesAndFiles;
+        FileSystemRights.DeleteSubdirectoriesAndFiles |
+        FileSystemRights.ChangePermissions;
 
     public string GetCurrentSddl(string folderPath)
     {
@@ -40,10 +41,10 @@ public class AclService : IAclService
             DirectoryInfo dInfo = new(folderPath);
             DirectorySecurity security = dInfo.GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner);
 
+            // 1. Explicit Deny rule for current user
             SecurityIdentifier? currentUser = WindowsIdentity.GetCurrent().User;
             if (currentUser != null)
             {
-                // Add explicit Deny rule for current user
                 var userDenyRule = new FileSystemAccessRule(
                     currentUser,
                     LockedDeniedRights,
@@ -54,7 +55,7 @@ public class AclService : IAclService
                 security.AddAccessRule(userDenyRule);
             }
 
-            // Also deny Authenticated Users
+            // 2. Deny Authenticated Users
             SecurityIdentifier authenticatedUsers = new(WellKnownSidType.AuthenticatedUserSid, null);
             var authUsersDenyRule = new FileSystemAccessRule(
                 authenticatedUsers,
@@ -62,10 +63,44 @@ public class AclService : IAclService
                 InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
                 PropagationFlags.None,
                 AccessControlType.Deny);
-
             security.AddAccessRule(authUsersDenyRule);
 
+            // 3. Deny Everyone (World) to prevent unauthenticated/guest/other user bypass
+            SecurityIdentifier worldUser = new(WellKnownSidType.WorldSid, null);
+            var worldDenyRule = new FileSystemAccessRule(
+                worldUser,
+                LockedDeniedRights,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Deny);
+            security.AddAccessRule(worldDenyRule);
+
+            // 4. Deny Builtin Administrators so Windows Explorer cannot prompt "Click Continue to permanently get access"
+            SecurityIdentifier adminGroup = new(WellKnownSidType.BuiltinAdministratorsSid, null);
+            var adminDenyRule = new FileSystemAccessRule(
+                adminGroup,
+                LockedDeniedRights,
+                InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                PropagationFlags.None,
+                AccessControlType.Deny);
+            security.AddAccessRule(adminDenyRule);
+
             dInfo.SetAccessControl(security);
+
+            // Ensure desktop.ini icon descriptor remains readable by Windows Explorer so the locked folder icon displays
+            try
+            {
+                string desktopIni = Path.Combine(folderPath, "desktop.ini");
+                if (File.Exists(desktopIni))
+                {
+                    SecApper.Security.Services.FolderIconService.ConfigureDesktopIniAcl(desktopIni);
+                }
+            }
+            catch
+            {
+                // Non-fatal
+            }
+
             return new AclOperationResult(true, null);
         }
         catch (UnauthorizedAccessException ex)

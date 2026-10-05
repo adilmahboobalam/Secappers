@@ -298,3 +298,128 @@ public class DatabaseServiceTests : IDisposable
         }
     }
 }
+
+public class FolderIconServiceTests : IDisposable
+{
+    private readonly string _testBaseDir;
+    private readonly string _iconPath;
+    private readonly FolderIconService _iconService;
+    private readonly AclService _aclService = new();
+
+    public FolderIconServiceTests()
+    {
+        _testBaseDir = Path.Combine(Path.GetTempPath(), "SecApperIconTests_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_testBaseDir);
+        _iconPath = Path.Combine(_testBaseDir, "test_locked.ico");
+        _iconService = new FolderIconService(_iconPath);
+    }
+
+    [Fact]
+    public void EnsureIconFileExists_ProducesOfficialSecApperIcon()
+    {
+        Assert.True(File.Exists(_iconPath));
+        byte[] bytes = File.ReadAllBytes(_iconPath);
+        Assert.True(bytes.Length > 0);
+        // Valid ICO signature
+        Assert.Equal(0, BitConverter.ToUInt16(bytes, 0)); // reserved
+        Assert.Equal(1, BitConverter.ToUInt16(bytes, 2)); // type 1 = icon
+        ushort count = BitConverter.ToUInt16(bytes, 4);
+        Assert.True(count >= 1);
+        // Exact length of our official multi-resolution icon (25,923 bytes)
+        Assert.Equal(25923, bytes.Length);
+    }
+
+    [Fact]
+    public void SetLockedIcon_And_RestoreDefaultIcon_WorkCorrectly()
+    {
+        string folder = Path.Combine(_testBaseDir, "TargetFolder");
+        Directory.CreateDirectory(folder);
+
+        // Apply locked icon
+        bool setSuccess = _iconService.SetLockedIcon(folder);
+        Assert.True(setSuccess);
+
+        string desktopIni = Path.Combine(folder, "desktop.ini");
+        Assert.True(File.Exists(desktopIni));
+
+        var folderAttrs = File.GetAttributes(folder);
+        Assert.True((folderAttrs & FileAttributes.ReadOnly) != 0);
+
+        var iniAttrs = File.GetAttributes(desktopIni);
+        Assert.True((iniAttrs & FileAttributes.Hidden) != 0);
+        Assert.True((iniAttrs & FileAttributes.System) != 0);
+
+        string iniContent = File.ReadAllText(desktopIni);
+        Assert.Contains(_iconPath, iniContent);
+        Assert.Contains("IconResource=", iniContent);
+
+        // Restore default icon
+        bool restoreSuccess = _iconService.RestoreDefaultIcon(folder);
+        Assert.True(restoreSuccess);
+        Assert.False(File.Exists(desktopIni));
+
+        folderAttrs = File.GetAttributes(folder);
+        Assert.False((folderAttrs & FileAttributes.ReadOnly) != 0);
+    }
+
+    [Fact]
+    public void LockedFolder_DesktopIniRemainsReadableUnderDenyAcl()
+    {
+        string folder = Path.Combine(_testBaseDir, "AclTargetFolder");
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "data.txt"), "Protected payload");
+
+        // Apply icon first
+        _iconService.SetLockedIcon(folder);
+
+        // Apply lock ACL
+        var lockResult = _aclService.ApplyLockAcl(folder);
+        Assert.True(lockResult.Success);
+
+        // Verify folder itself is locked
+        Assert.True(_aclService.VerifyIsLocked(folder));
+
+        // CRITICAL: desktop.ini MUST remain readable by Explorer / current user
+        string desktopIni = Path.Combine(folder, "desktop.ini");
+        Assert.True(File.Exists(desktopIni));
+        string iniText = File.ReadAllText(desktopIni);
+        Assert.Contains(_iconPath, iniText);
+
+        // Restore ACL
+        var folderInfo = new DirectoryInfo(folder);
+        var sec = folderInfo.GetAccessControl();
+        var rules = sec.GetAccessRules(true, false, typeof(System.Security.Principal.SecurityIdentifier));
+        foreach (System.Security.AccessControl.FileSystemAccessRule rule in rules)
+        {
+            if (rule.AccessControlType == System.Security.AccessControl.AccessControlType.Deny)
+            {
+                sec.RemoveAccessRule(rule);
+            }
+        }
+        folderInfo.SetAccessControl(sec);
+
+        _iconService.RestoreDefaultIcon(folder);
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (Directory.Exists(_testBaseDir))
+            {
+                // Clear any read-only flags
+                foreach (var file in Directory.GetFiles(_testBaseDir, "*", SearchOption.AllDirectories))
+                {
+                    try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                }
+                foreach (var dir in Directory.GetDirectories(_testBaseDir, "*", SearchOption.AllDirectories))
+                {
+                    try { File.SetAttributes(dir, FileAttributes.Normal); } catch { }
+                }
+                Directory.Delete(_testBaseDir, true);
+            }
+        }
+        catch { }
+    }
+}
+

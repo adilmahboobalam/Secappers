@@ -421,7 +421,7 @@ public class UpdateService : IUpdateService
                 var psi = new ProcessStartInfo
                 {
                     FileName = packagePath,
-                    Arguments = "/SILENT /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+                    Arguments = $"/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /FORCECLOSEAPPLICATIONS /CURRENTUSER /DIR=\"{baseDir}\"",
                     UseShellExecute = true
                 };
 

@@ -113,7 +113,9 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                                                 combined.Contains(folderName, StringComparison.OrdinalIgnoreCase) &&
                                                 (combined.Contains("Access is denied", StringComparison.OrdinalIgnoreCase) ||
                                                  combined.Contains("Location is not available", StringComparison.OrdinalIgnoreCase) ||
-                                                 combined.Contains("not accessible", StringComparison.OrdinalIgnoreCase));
+                                                 combined.Contains("not accessible", StringComparison.OrdinalIgnoreCase) ||
+                                                 combined.Contains("denied permission", StringComparison.OrdinalIgnoreCase) ||
+                                                 combined.Contains("permission to access", StringComparison.OrdinalIgnoreCase));
 
                     if (matchesPath || matchesNameAndDenied)
                     {

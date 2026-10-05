@@ -197,6 +197,16 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    public void ShutdownApp()
+    {
+        _isExplicitExit = true;
+        try { _accessMonitor.Stop(); } catch { }
+        try { _accessMonitor.Dispose(); } catch { }
+        try { _trayService.Dispose(); } catch { }
+        Close();
+        Environment.Exit(0);
+    }
+
     protected override void OnClosing(CancelEventArgs e)
     {
         if (!_isExplicitExit)

@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import type { FolderRecord } from '../../types';
 import FolderStatus from './FolderStatus.vue';
 import Button from '../common/Button.vue';
+import shieldUrl from '../../assets/branding/secapper-shield.png';
 import {
   Lock,
   Unlock,
@@ -76,11 +77,16 @@ function handleRemove() {
           :class="[
             'w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border shadow-xs',
             folder.status === 'Locked'
-              ? 'bg-[#FEF3F2] dark:bg-[#7F1D1D]/30 border-[#FECDCA] dark:border-[#DC2626]/40 text-[#C5202B]'
+              ? 'bg-[#122D55]/10 dark:bg-[#122D55]/30 border-[#122D55]/20 dark:border-[#3B82F6]/30 text-[#C5202B]'
               : 'bg-[#ECFDF3] dark:bg-[#064E3B]/30 border-[#ABEFC6] dark:border-[#059669]/40 text-[#12B76A]'
           ]"
         >
-          <Lock v-if="folder.status === 'Locked'" class="w-5 h-5 stroke-[2]" />
+          <img
+            v-if="folder.status === 'Locked'"
+            :src="shieldUrl"
+            alt="SecApper Shield"
+            class="w-6 h-6 object-contain filter drop-shadow-xs"
+          />
           <FolderOpen v-else class="w-5 h-5 stroke-[2]" />
         </div>
 

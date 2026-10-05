@@ -51,33 +51,67 @@ public static class Program
         Log($"Target Directory: {targetDir}");
         Log($"Package: {packagePath}");
 
-        // Step 1: Wait for caller application to terminate
+        // Step 1: Forcefully terminate ALL running SecApper.FolderLocker instances to release all DLL file locks
+        Log("Terminating all active SecApper instances to ensure zero file locks...");
+        try
+        {
+            var runningProcs = Process.GetProcessesByName("SecApper.FolderLocker");
+            foreach (var proc in runningProcs)
+            {
+                try
+                {
+                    Log($"Terminating SecApper process PID {proc.Id}...");
+                    proc.Kill(true);
+                    proc.WaitForExit(5000);
+                }
+                catch (Exception pEx)
+                {
+                    Log($"Warning terminating PID {proc.Id}: {pEx.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Warning finding SecApper processes: {ex.Message}");
+        }
+
         if (callerPid > 0)
         {
-            Log($"Waiting for caller process {callerPid} to exit...");
             try
             {
                 var proc = Process.GetProcessById(callerPid);
-                if (!proc.WaitForExit(15000))
+                if (!proc.HasExited)
                 {
-                    Log($"Caller PID {callerPid} did not exit within 15 seconds, killing...");
-                    proc.Kill();
+                    proc.Kill(true);
                     proc.WaitForExit(3000);
                 }
             }
-            catch (ArgumentException)
-            {
-                // Already exited
-                Log("Caller process already exited.");
-            }
-            catch (Exception ex)
-            {
-                Log($"Warning waiting for caller: {ex.Message}");
-            }
+            catch { }
         }
 
-        // Give file handles 1 second to release completely
-        Thread.Sleep(1000);
+        // Also terminate any lingering processes located inside targetDir
+        try
+        {
+            foreach (var p in Process.GetProcesses())
+            {
+                try
+                {
+                    if (p.Id != Environment.ProcessId &&
+                        p.MainModule?.FileName != null &&
+                        p.MainModule.FileName.StartsWith(targetDir, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Log($"Terminating in-folder process {p.ProcessName} (PID {p.Id})...");
+                        p.Kill(true);
+                        p.WaitForExit(3000);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        // Give file handles and child processes 2 seconds to release completely
+        Thread.Sleep(2000);
 
         // Step 2: Create atomic backup directory of existing application files
         string backupDir = Path.Combine(targetDir, $"_backup_{DateTime.UtcNow:yyyyMMddHHmmss}");
@@ -133,7 +167,7 @@ public static class Program
                 var psi = new ProcessStartInfo
                 {
                     FileName = packagePath,
-                    Arguments = $"/SILENT /SP- /NORESTART /CLOSEAPPLICATIONS /DIR=\"{targetDir}\"",
+                    Arguments = $"/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /FORCECLOSEAPPLICATIONS /CURRENTUSER /DIR=\"{targetDir}\"",
                     UseShellExecute = true
                 };
 

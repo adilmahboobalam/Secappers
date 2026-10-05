@@ -3,7 +3,10 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 
 namespace SecApper.Security.Services;
@@ -59,9 +62,12 @@ public class FolderIconService : IFolderIconService
                 File.SetAttributes(desktopIni, FileAttributes.Normal);
             }
 
-            // Write desktop.ini referencing our locked.ico
+            // Write desktop.ini referencing our official SecApper icon
             string iniContent = $"[.ShellClassInfo]\r\nIconResource={_iconPath},0\r\n[ViewState]\r\nMode=\r\nVid=\r\nFolderType=Generic\r\n";
             File.WriteAllText(desktopIni, iniContent, Encoding.Unicode);
+
+            // Configure desktop.ini ACL to prevent Deny inheritance so Windows Explorer can render our icon
+            ConfigureDesktopIniAcl(desktopIni);
 
             // Windows Explorer requires desktop.ini to be Hidden + System
             File.SetAttributes(desktopIni, FileAttributes.Hidden | FileAttributes.System);
@@ -112,6 +118,40 @@ public class FolderIconService : IFolderIconService
         }
     }
 
+    public static void ConfigureDesktopIniAcl(string desktopIni)
+    {
+        try
+        {
+            if (!File.Exists(desktopIni)) return;
+
+            FileInfo fInfo = new(desktopIni);
+            var iniAcl = fInfo.GetAccessControl();
+            // Protect from inheritance so the locked folder's Deny ACEs do not propagate to desktop.ini
+            iniAcl.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+
+            var authUsers = new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null);
+            iniAcl.AddAccessRule(new FileSystemAccessRule(authUsers, FileSystemRights.ReadAndExecute, AccessControlType.Allow));
+
+            var currentUser = WindowsIdentity.GetCurrent().User;
+            if (currentUser != null)
+            {
+                iniAcl.AddAccessRule(new FileSystemAccessRule(currentUser, FileSystemRights.FullControl, AccessControlType.Allow));
+            }
+
+            var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+            iniAcl.AddAccessRule(new FileSystemAccessRule(admins, FileSystemRights.FullControl, AccessControlType.Allow));
+
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            iniAcl.AddAccessRule(new FileSystemAccessRule(system, FileSystemRights.FullControl, AccessControlType.Allow));
+
+            fInfo.SetAccessControl(iniAcl);
+        }
+        catch
+        {
+            // Non-fatal if setting ACL on desktop.ini fails (e.g. non-NTFS volumes or mock test paths)
+        }
+    }
+
     private static void NotifyShell(string folderPath)
     {
         try
@@ -128,7 +168,20 @@ public class FolderIconService : IFolderIconService
     {
         try
         {
-            if (File.Exists(iconPath)) return;
+            byte[] officialBytes = GetOfficialIconBytes();
+
+            // If file already exists and matches official icon size, we're all set
+            if (File.Exists(iconPath))
+            {
+                var fileInfo = new FileInfo(iconPath);
+                if (fileInfo.Length == officialBytes.Length)
+                {
+                    return;
+                }
+
+                // If outdated or procedural padlock, reset attributes so we can overwrite
+                File.SetAttributes(iconPath, FileAttributes.Normal);
+            }
 
             string? dir = Path.GetDirectoryName(iconPath);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
@@ -136,9 +189,7 @@ public class FolderIconService : IFolderIconService
                 Directory.CreateDirectory(dir);
             }
 
-            // Generate crisp padlock icon in memory and save as valid .ICO
-            byte[] icoBytes = GeneratePadlockIconBytes();
-            File.WriteAllBytes(iconPath, icoBytes);
+            File.WriteAllBytes(iconPath, officialBytes);
         }
         catch
         {
@@ -146,7 +197,58 @@ public class FolderIconService : IFolderIconService
         }
     }
 
-    private static byte[] GeneratePadlockIconBytes()
+    private static byte[] GetOfficialIconBytes()
+    {
+        // 1. Try reading from assembly embedded resource
+        try
+        {
+            var assembly = typeof(FolderIconService).Assembly;
+            var resourceNames = assembly.GetManifestResourceNames();
+            foreach (var name in resourceNames)
+            {
+                if (name.EndsWith("app.ico", StringComparison.OrdinalIgnoreCase))
+                {
+                    using var stream = assembly.GetManifestResourceStream(name);
+                    if (stream != null)
+                    {
+                        using var ms = new MemoryStream();
+                        stream.CopyTo(ms);
+                        byte[] data = ms.ToArray();
+                        if (data.Length > 0) return data;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        // 2. Try locating on filesystem in standard app and build directories
+        string[] candidatePaths =
+        [
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "app.ico"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.ico"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Resources", "app.ico"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "assets", "app.ico"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "assets", "app.ico")
+        ];
+
+        foreach (var path in candidatePaths)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    byte[] data = File.ReadAllBytes(path);
+                    if (data.Length > 0) return data;
+                }
+            }
+            catch { }
+        }
+
+        // 3. Fallback: Generate crisp SecApper shield icon in memory
+        return GenerateSecApperShieldIconBytes();
+    }
+
+    private static byte[] GenerateSecApperShieldIconBytes()
     {
         int size = 48;
         using var bitmap = new Bitmap(size, size, PixelFormat.Format32bppArgb);
@@ -155,43 +257,50 @@ public class FolderIconService : IFolderIconService
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(Color.Transparent);
 
-            // Outer dark security shield/badge background
-            using var bgBrush = new SolidBrush(Color.FromArgb(240, 20, 25, 35));
-            using var borderPen = new Pen(Color.FromArgb(255, 235, 87, 87), 2.5f);
-            
-            // Draw rounded badge
-            using var path = new GraphicsPath();
-            float r = 8f;
-            RectangleF rect = new(3, 3, size - 6, size - 6);
-            path.AddArc(rect.X, rect.Y, r * 2, r * 2, 180, 90);
-            path.AddArc(rect.Right - r * 2, rect.Y, r * 2, r * 2, 270, 90);
-            path.AddArc(rect.Right - r * 2, rect.Bottom - r * 2, r * 2, r * 2, 0, 90);
-            path.AddArc(rect.X, rect.Bottom - r * 2, r * 2, r * 2, 90, 90);
-            path.CloseFigure();
+            // SecApper deep navy shield background (#091D38)
+            using var bgBrush = new SolidBrush(Color.FromArgb(255, 9, 29, 56));
+            using var borderPen = new Pen(Color.FromArgb(255, 18, 45, 85), 2f);
 
-            g.FillPath(bgBrush, path);
-            g.DrawPath(borderPen, path);
+            // Shield polygon points
+            PointF[] shieldPoints =
+            [
+                new PointF(24, 4),
+                new PointF(42, 10),
+                new PointF(42, 28),
+                new PointF(24, 44),
+                new PointF(6, 28),
+                new PointF(6, 10)
+            ];
 
-            // Shackle (padlock top loop)
-            using var shacklePen = new Pen(Color.FromArgb(255, 240, 195, 48), 3.5f);
-            g.DrawArc(shacklePen, 17, 12, 14, 14, 180, 180);
-            g.DrawLine(shacklePen, 17, 19, 17, 24);
-            g.DrawLine(shacklePen, 31, 19, 31, 24);
+            using var shieldPath = new GraphicsPath();
+            shieldPath.AddPolygon(shieldPoints);
+            g.FillPath(bgBrush, shieldPath);
+            g.DrawPath(borderPen, shieldPath);
 
-            // Lock body
-            using var bodyBrush = new LinearGradientBrush(
-                new PointF(13, 23),
-                new PointF(35, 39),
-                Color.FromArgb(255, 243, 156, 18),
-                Color.FromArgb(255, 211, 84, 0));
-            
-            Rectangle lockBody = new(13, 22, 22, 16);
-            g.FillRectangle(bodyBrush, lockBody);
+            // White stylized security crest & red accent (#C5202B)
+            using var whiteBrush = new SolidBrush(Color.White);
+            using var redBrush = new SolidBrush(Color.FromArgb(255, 197, 32, 43));
 
-            // Keyhole
-            using var keyHoleBrush = new SolidBrush(Color.FromArgb(255, 20, 20, 20));
-            g.FillEllipse(keyHoleBrush, 22, 26, 4, 4);
-            g.FillRectangle(keyHoleBrush, 23, 29, 2, 5);
+            // Inner stylized S/crest shape
+            PointF[] sPoints =
+            [
+                new PointF(14, 15),
+                new PointF(34, 15),
+                new PointF(34, 21),
+                new PointF(21, 21),
+                new PointF(21, 25),
+                new PointF(34, 25),
+                new PointF(34, 33),
+                new PointF(14, 33),
+                new PointF(14, 27),
+                new PointF(27, 27),
+                new PointF(27, 23),
+                new PointF(14, 23)
+            ];
+            g.FillPolygon(whiteBrush, sPoints);
+
+            // Red accent dot/eye
+            g.FillEllipse(redBrush, 28, 17, 4, 3);
         }
 
         // Encode as PNG into memory
@@ -199,26 +308,23 @@ public class FolderIconService : IFolderIconService
         bitmap.Save(pngStream, ImageFormat.Png);
         byte[] pngData = pngStream.ToArray();
 
-        // Wrap PNG inside ICO container
+        // Wrap PNG inside standard ICO container
         using var icoStream = new MemoryStream();
         using var writer = new BinaryWriter(icoStream);
 
-        // ICONDIR
         writer.Write((ushort)0); // reserved
         writer.Write((ushort)1); // type 1 = icon
         writer.Write((ushort)1); // 1 image
 
-        // ICONDIRENTRY
-        writer.Write((byte)size); // width
-        writer.Write((byte)size); // height
-        writer.Write((byte)0);    // color count
-        writer.Write((byte)0);    // reserved
-        writer.Write((ushort)1);  // color planes
-        writer.Write((ushort)32); // bpp
-        writer.Write((uint)pngData.Length); // size of image data
-        writer.Write((uint)22);   // offset (6 + 16 = 22)
+        writer.Write((byte)size);
+        writer.Write((byte)size);
+        writer.Write((byte)0);
+        writer.Write((byte)0);
+        writer.Write((ushort)1);
+        writer.Write((ushort)32);
+        writer.Write((uint)pngData.Length);
+        writer.Write((uint)22);
 
-        // Image data (PNG bytes)
         writer.Write(pngData);
 
         return icoStream.ToArray();

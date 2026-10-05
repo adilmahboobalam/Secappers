@@ -183,6 +183,90 @@ public class FolderLockIntegrationTests : IDisposable
         await _db.DeleteFolderAsync(record.Id);
     }
 
+    [Fact]
+    public async Task LockedFolder_RemainsLockedWhenAppExits_AndDeniesChangePermissions()
+    {
+        await _db.InitializeAsync();
+        string testFolder = Path.Combine(_testBaseDir, "ShutdownPersistenceFolder");
+        Directory.CreateDirectory(testFolder);
+        File.WriteAllText(Path.Combine(testFolder, "financials.xlsx"), "Confidential financial ledger");
+
+        string password = "StrongPassword987!";
+        var hashResult = _passwordService.HashPassword(password);
+
+        var folder = new FolderRecord
+        {
+            FolderPath = testFolder,
+            FolderName = "ShutdownPersistenceFolder",
+            Status = FolderStatus.Unlocked,
+            PasswordHash = hashResult.Hash,
+            PasswordSalt = hashResult.Salt,
+            PasswordAlgorithm = hashResult.Algorithm,
+            PasswordIterations = hashResult.Iterations
+        };
+
+        await _db.AddFolderAsync(folder);
+
+        // 1. Lock the folder
+        var lockRes = await _lockService.LockFolderAsync(folder.Id);
+        Assert.True(lockRes.Success, lockRes.ErrorMessage);
+
+        // 2. Verify physical NTFS state: Deny rules MUST include ChangePermissions
+        DirectoryInfo dInfo = new(testFolder);
+        DirectorySecurity sec = dInfo.GetAccessControl(AccessControlSections.Access);
+        var rules = sec.GetAccessRules(true, false, typeof(System.Security.Principal.SecurityIdentifier));
+        
+        bool hasChangePermissionsDeny = false;
+        bool hasAdminDeny = false;
+        bool hasWorldDeny = false;
+
+        var adminSid = new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid, null);
+        var worldSid = new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.WorldSid, null);
+
+        foreach (FileSystemAccessRule r in rules)
+        {
+            if (r.AccessControlType == AccessControlType.Deny)
+            {
+                if ((r.FileSystemRights & FileSystemRights.ChangePermissions) == FileSystemRights.ChangePermissions)
+                {
+                    hasChangePermissionsDeny = true;
+                }
+                if (r.IdentityReference.Equals(adminSid))
+                {
+                    hasAdminDeny = true;
+                }
+                if (r.IdentityReference.Equals(worldSid))
+                {
+                    hasWorldDeny = true;
+                }
+            }
+        }
+
+        Assert.True(hasChangePermissionsDeny, "ChangePermissions MUST be explicitly denied to prevent Explorer Continue prompt bypass.");
+        Assert.True(hasAdminDeny, "Administrators group MUST be denied to prevent elevation bypass when app is closed.");
+        Assert.True(hasWorldDeny, "Everyone/World group MUST be denied to prevent other user bypass.");
+
+        // 3. Simulate App Closing / Process terminating completely
+        // Re-create services from scratch to simulate a fresh application boot
+        var freshDb = new SqliteDatabaseService(_dbPath);
+        var freshAcl = new AclService();
+        var freshBackup = new PermissionBackupService(freshAcl, freshDb);
+        var freshIcons = new FolderIconService();
+        var freshLockService = new FolderLockService(freshDb, freshAcl, freshBackup, _passwordService, freshIcons);
+
+        // Verify folder is STILL locked on disk without app running
+        Assert.True(freshAcl.VerifyIsLocked(testFolder), "Folder must remain strictly locked after app is closed.");
+        Assert.False(freshAcl.VerifyIsAccessible(testFolder));
+
+        // 4. Unlock with fresh service
+        var unlockRes = await freshLockService.UnlockFolderAsync(folder.Id, password);
+        Assert.True(unlockRes.Success, unlockRes.ErrorMessage);
+
+        // 5. Verify restored
+        Assert.True(freshAcl.VerifyIsAccessible(testFolder));
+        Assert.True(File.Exists(Path.Combine(testFolder, "financials.xlsx")));
+    }
+
     public void Dispose()
     {
         try

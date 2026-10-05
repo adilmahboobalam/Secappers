@@ -30,6 +30,8 @@ public class VueBridgeController
     private readonly IPasswordService _passwordService;
     private readonly IFolderPathValidator _pathValidator;
     private readonly SystemTrayService _trayService;
+    private SecApper.Security.Updates.UpdateInfo? _lastUpdateInfo;
+    private string? _downloadedPackagePath;
 
     public VueBridgeController(
         Window window,
@@ -403,6 +405,10 @@ public class VueBridgeController
             case "updates.check":
             {
                 var result = await _updateService.CheckForUpdatesAsync(true);
+                if (result.Update != null)
+                {
+                    _lastUpdateInfo = result.Update;
+                }
                 return new
                 {
                     currentVersion = _updateService.CurrentVersion,
@@ -413,6 +419,89 @@ public class VueBridgeController
                     statusMessage = result.IsUpdateAvailable ? "Update available." : "SecApper is up to date.",
                     downloadProgress = 0
                 };
+            }
+
+            case "updates.download":
+            {
+                if (_lastUpdateInfo == null)
+                {
+                    var checkRes = await _updateService.CheckForUpdatesAsync(true);
+                    _lastUpdateInfo = checkRes.Update;
+                }
+
+                if (_lastUpdateInfo == null)
+                {
+                    return new { success = false, error = "No update package available to download." };
+                }
+
+                var progress = new Progress<SecApper.Security.Updates.UpdateProgress>(p =>
+                {
+                    SendEvent("updateProgress", new
+                    {
+                        progress = p.Percentage,
+                        message = p.StatusMessage
+                    });
+                });
+
+                try
+                {
+                    _downloadedPackagePath = await _updateService.DownloadUpdateAsync(_lastUpdateInfo, progress);
+
+                    bool isValid = _updateService.VerifyUpdatePackage(_downloadedPackagePath, _lastUpdateInfo, out string? verifyError);
+                    if (!isValid)
+                    {
+                        return new { success = false, error = verifyError ?? "Update package verification failed." };
+                    }
+
+                    return new { success = true, packagePath = _downloadedPackagePath };
+                }
+                catch (Exception ex)
+                {
+                    return new { success = false, error = $"Download failed: {ex.Message}" };
+                }
+            }
+
+            case "updates.install":
+            {
+                if (string.IsNullOrEmpty(_downloadedPackagePath) || !File.Exists(_downloadedPackagePath))
+                {
+                    if (_lastUpdateInfo == null)
+                    {
+                        var checkRes = await _updateService.CheckForUpdatesAsync(true);
+                        _lastUpdateInfo = checkRes.Update;
+                    }
+
+                    if (_lastUpdateInfo == null)
+                    {
+                        return new { success = false, error = "Update package not found. Please download the update first." };
+                    }
+
+                    _downloadedPackagePath = await _updateService.DownloadUpdateAsync(_lastUpdateInfo);
+                }
+
+                if (_lastUpdateInfo == null)
+                {
+                    return new { success = false, error = "Update package metadata is missing." };
+                }
+
+                bool launched = await _updateService.LaunchUpdaterAndExitAsync(_downloadedPackagePath, _lastUpdateInfo);
+                if (launched)
+                {
+                    await _window.Dispatcher.InvokeAsync(() =>
+                    {
+                        if (_window is MainWindow mw)
+                        {
+                            mw.ShutdownApp();
+                        }
+                        else
+                        {
+                            Environment.Exit(0);
+                        }
+                    });
+                    return new { success = true };
+                }
+
+                return new { success = false, error = "Failed to launch SecApper updater process." };
             }
 
             // --- Settings ---

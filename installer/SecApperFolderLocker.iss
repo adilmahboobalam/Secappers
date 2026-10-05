@@ -22,12 +22,13 @@ Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequiredOverridesAllowed=commandline
 DisableDirPage=no
 DisableProgramGroupPage=no
 ArchitecturesInstallIn64BitMode=x64
 CloseApplications=yes
-CloseApplicationsFilter=*.exe
+CloseApplicationsFilter=SecApper.FolderLocker.exe
+RestartApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

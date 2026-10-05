@@ -47,10 +47,23 @@ public class MainViewModel : ViewModelBase
     private bool _isCheckingForUpdates;
 
     public ObservableCollection<FolderItemViewModel> Folders { get; } = new();
+    public ObservableCollection<FolderItemViewModel> RecentFolders { get; } = new();
     public ObservableCollection<SecurityEvent> SecurityEvents { get; } = new();
     public ObservableCollection<SecurityEventItemViewModel> AllEvents { get; } = new();
     public ObservableCollection<SecurityEventItemViewModel> FilteredEvents { get; } = new();
+    public ObservableCollection<SecurityEventItemViewModel> RecentEvents { get; } = new();
     public ObservableCollection<RecoveryIssue> RecoveryIssues { get; } = new();
+
+    public bool HasRecentFolders => RecentFolders.Count > 0;
+    public bool HasRecentEvents => RecentEvents.Count > 0;
+    public int TodayEventsCount => SecurityEvents.Count(e => e.CreatedAt.Date == DateTime.UtcNow.Date);
+
+    private string _settingsTab = "General";
+    public string SettingsTab
+    {
+        get => _settingsTab;
+        set => SetProperty(ref _settingsTab, value);
+    }
 
     public string CurrentAppVersion => _updateService.CurrentVersion;
 
@@ -325,6 +338,7 @@ public class MainViewModel : ViewModelBase
     public ICommand ExportEventsCommand { get; }
     public ICommand SimulateThreatAlertCommand { get; }
     public ICommand ChangeMasterPinCommand { get; }
+    public ICommand SelectSettingsTabCommand { get; }
 
     public MainViewModel(
         IDatabaseService databaseService,
@@ -384,6 +398,7 @@ public class MainViewModel : ViewModelBase
         ExportEventsCommand = new RelayCommand(ExecuteExportEvents);
         SimulateThreatAlertCommand = new AsyncRelayCommand(ExecuteSimulateThreatAlertAsync);
         ChangeMasterPinCommand = new RelayCommand(ExecuteChangeMasterPin);
+        SelectSettingsTabCommand = new RelayCommand(tab => SettingsTab = tab?.ToString() ?? "General");
     }
 
     public async Task InitializeAsync()
@@ -455,6 +470,15 @@ public class MainViewModel : ViewModelBase
             AllEvents.Add(new SecurityEventItemViewModel(evt, folderDisplay));
         }
 
+        RecentEvents.Clear();
+        foreach (var evtItem in AllEvents.Take(4))
+        {
+            RecentEvents.Add(evtItem);
+        }
+        OnPropertyChanged(nameof(RecentEvents));
+        OnPropertyChanged(nameof(HasRecentEvents));
+        OnPropertyChanged(nameof(TodayEventsCount));
+
         ApplyEventFilter();
         UpdateSecurityStatus();
     }
@@ -487,6 +511,14 @@ public class MainViewModel : ViewModelBase
 
     private void UpdateCounts()
     {
+        RecentFolders.Clear();
+        foreach (var f in Folders.Take(3))
+        {
+            RecentFolders.Add(f);
+        }
+        OnPropertyChanged(nameof(RecentFolders));
+        OnPropertyChanged(nameof(HasRecentFolders));
+
         OnPropertyChanged(nameof(TotalFoldersCount));
         OnPropertyChanged(nameof(LockedCount));
         OnPropertyChanged(nameof(UnlockedCount));

@@ -38,6 +38,7 @@
         <StreamGeometry x:Key="GeoLock">M7 11V7a5 5 0 0 1 10 0v4 M5 11h14v10H5z M12 15v2</StreamGeometry>
         <StreamGeometry x:Key="GeoUnlock">M7 11V7a5 5 0 0 1 9.9-1 M5 11h14v10H5z M12 15v2</StreamGeometry>
         <StreamGeometry x:Key="GeoFolderLock">M4 4h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M10 13a2 2 0 0 1 4 0v1h1v4H9v-4h1v-1z</StreamGeometry>
+        <StreamGeometry x:Key="GeoShield">M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z</StreamGeometry>
         <StreamGeometry x:Key="GeoShieldAlert">M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M12 8v4 M12 16h.01</StreamGeometry>
         <StreamGeometry x:Key="GeoShieldCheck">M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z M9 12l2 2 4-4</StreamGeometry>
         <StreamGeometry x:Key="GeoActivity">M22 12h-4l-3 9L9 3l-3 9H2</StreamGeometry>

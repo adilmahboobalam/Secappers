@@ -19,9 +19,14 @@ public class UpdateService : IUpdateService
 
     private static HttpClient CreateHttpClient()
     {
-        var client = new HttpClient
+        var handler = new HttpClientHandler
         {
-            Timeout = TimeSpan.FromSeconds(30)
+            AllowAutoRedirect = true,
+            AutomaticDecompression = System.Net.DecompressionMethods.All
+        };
+        var client = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromMinutes(15)
         };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("SecApper-Updater/1.1.0 (Windows NT 10.0; Win64; x64)");
         return client;
@@ -103,15 +108,25 @@ public class UpdateService : IUpdateService
             }
             else
             {
+                string requestUrl = manifestUrl;
+                if (requestUrl.Contains("raw.githubusercontent.com", StringComparison.OrdinalIgnoreCase))
+                {
+                    string sep = requestUrl.Contains('?') ? "&" : "?";
+                    requestUrl = $"{requestUrl}{sep}_t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                }
+
                 // Enforce HTTPS or loopback for testing
-                if (!Uri.TryCreate(manifestUrl, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !uri.IsLoopback))
+                if (!Uri.TryCreate(requestUrl, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && !uri.IsLoopback))
                 {
                     return new UpdateCheckResult(false, null, _currentVersion, "Security error: Remote update manifest URL must use HTTPS.");
                 }
 
                 try
                 {
-                    using var response = await HttpClient.GetAsync(uri, HttpCompletionOption.ResponseContentRead, ct);
+                    using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+                    request.Headers.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
+
+                    using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseContentRead, ct);
                     if (response.StatusCode == System.Net.HttpStatusCode.NotFound && uri.Host.Contains("github", StringComparison.OrdinalIgnoreCase))
                     {
                         return new UpdateCheckResult(false, null, _currentVersion,
@@ -171,7 +186,7 @@ public class UpdateService : IUpdateService
             }
 
             bool isNewer = availableSemVer > currentSemVer;
-            return new UpdateCheckResult(isNewer, isNewer ? updateInfo : null, _currentVersion, null);
+            return new UpdateCheckResult(isNewer, updateInfo, _currentVersion, null);
         }
         catch (HttpRequestException ex)
         {
@@ -232,23 +247,52 @@ public class UpdateService : IUpdateService
         }
         else
         {
-            using var response = await HttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            long totalBytes = response.Content.Headers.ContentLength ?? -1;
-
-            await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-
-            byte[] buffer = new byte[81920];
-            long totalRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+            HttpResponseMessage response;
+            try
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                totalRead += bytesRead;
-                progress?.Report(new UpdateProgress(totalRead, totalBytes, $"Downloading update ({totalRead / (1024 * 1024)} MB)..."));
+                response = await HttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound && 
+                    uri.Host.Contains("github.com", StringComparison.OrdinalIgnoreCase) && 
+                    uri.AbsolutePath.Contains("/releases/download/"))
+                {
+                    // Fallback to raw repository path
+                    string fileName = Path.GetFileName(uri.LocalPath);
+                    string rawFallback = $"https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/{fileName}";
+                    if (Uri.TryCreate(rawFallback, UriKind.Absolute, out var fallbackUri))
+                    {
+                        response.Dispose();
+                        response = await HttpClient.GetAsync(fallbackUri, HttpCompletionOption.ResponseHeadersRead, ct);
+                    }
+                }
+                response.EnsureSuccessStatusCode();
+            }
+            catch (HttpRequestException ex)
+            {
+                throw new InvalidOperationException($"Could not download update package from server: {ex.Message}", ex);
+            }
+
+            long totalBytes = -1;
+            long totalRead = 0;
+
+            using (response)
+            {
+                totalBytes = response.Content.Headers.ContentLength ?? -1;
+
+                await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
+                await using var fileStream = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+
+                byte[] buffer = new byte[81920];
+                int bytesRead;
+
+                while ((bytesRead = await contentStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                    totalRead += bytesRead;
+                    string sizeInfo = totalBytes > 0 
+                        ? $"{totalRead / (1024 * 1024)} MB / {totalBytes / (1024 * 1024)} MB"
+                        : $"{totalRead / (1024 * 1024)} MB";
+                    progress?.Report(new UpdateProgress(totalRead, totalBytes, $"Downloading update ({sizeInfo})..."));
+                }
             }
 
             progress?.Report(new UpdateProgress(totalRead, totalBytes, "Download completed. Verifying package..."));
@@ -260,11 +304,16 @@ public class UpdateService : IUpdateService
     {
         await Task.Yield();
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-        string setupExe = Path.Combine(baseDir, "SecApperFolderLockerSetup.exe");
+        string setupExe = Path.Combine(baseDir, "SecApperFolderLockerSetup_v1.1.0.exe");
         if (!File.Exists(setupExe))
         {
-            setupExe = Path.Combine(baseDir, "..", "..", "..", "..", "..", "installer", "output", "SecApperFolderLockerSetup.exe");
+            setupExe = Path.Combine(baseDir, "..", "..", "..", "..", "..", "installer", "output", "SecApperFolderLockerSetup_v1.1.0.exe");
             if (File.Exists(setupExe)) setupExe = Path.GetFullPath(setupExe);
+        }
+        if (!File.Exists(setupExe))
+        {
+            string fallbackExe = Path.Combine(baseDir, "SecApperFolderLockerSetup.exe");
+            if (File.Exists(fallbackExe)) setupExe = fallbackExe;
         }
 
         string sha256 = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -278,13 +327,13 @@ public class UpdateService : IUpdateService
 
         return new UpdateInfo
         {
-            Version = "1.1.0",
+            Version = "1.2.0",
             ReleaseDate = DateTime.UtcNow.ToString("yyyy-MM-dd"),
-            DownloadUrl = File.Exists(setupExe) ? new Uri(setupExe).AbsoluteUri : "https://updates.secapper.com/secapper/1.1.0/SecApperFolderLockerSetup.exe",
+            DownloadUrl = File.Exists(setupExe) ? new Uri(setupExe).AbsoluteUri : "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
             Sha256 = sha256,
             Mandatory = false,
             MinSupportedVersion = "1.0.0",
-            ReleaseNotes = "SecApper v1.1.0 Major Update:\n• Active double-click Windows Explorer unlock popup\n• Native NTFS Discretionary Access Control enforcement\n• Operation journal crash recovery\n• Background ransomware threat protection\n• Standalone zero-downtime auto-updater"
+            ReleaseNotes = "SecApper v1.2.0 Live Update:\n• Fixed Master Security PIN configured on installation for universal folder unlock\n• Active double-click Windows Explorer unlock popup\n• Native NTFS Discretionary Access Control enforcement\n• Operation journal crash recovery\n• Background ransomware threat protection\n• Standalone zero-downtime auto-updater"
         };
     }
 

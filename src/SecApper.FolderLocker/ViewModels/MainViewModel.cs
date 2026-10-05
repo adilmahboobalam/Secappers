@@ -1323,7 +1323,32 @@ public class MainViewModel : ViewModelBase
                     UpdateStatusMessage = $"You're up to date! SecApper v{CurrentAppVersion} is the latest version.";
                     if (isManual)
                     {
-                        MessageBox.Show($"You're up to date!\n\nSecApper Folder Locker v{CurrentAppVersion} is currently the latest version.", "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                        if (checkResult.Update != null)
+                        {
+                            var prompt = MessageBox.Show(
+                                $"SecApper is running v{CurrentAppVersion}.\n\n" +
+                                $"Latest online release: v{checkResult.Update.Version}\n\n" +
+                                "Would you like to download and install the latest live update build from the server?",
+                                "Check for Updates",
+                                MessageBoxButton.YesNo,
+                                MessageBoxImage.Information);
+
+                            if (prompt == MessageBoxResult.Yes)
+                            {
+                                Application.Current?.Dispatcher?.Invoke(() =>
+                                {
+                                    var dialog = new UpdateAvailableDialog(_updateService, checkResult.Update)
+                                    {
+                                        Owner = Application.Current?.MainWindow
+                                    };
+                                    dialog.ShowDialog();
+                                });
+                            }
+                        }
+                        else
+                        {
+                            MessageBox.Show($"You're up to date!\n\nSecApper Folder Locker v{CurrentAppVersion} is currently the latest version.", "Check for Updates", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
                     }
                 }
             }

@@ -2,7 +2,8 @@
 bin/
 obj/
 publish/
-installer/output/
+installer/output/*
+!installer/output/*.exe
 TestResults/
 
 ## Visual Studio / IDE

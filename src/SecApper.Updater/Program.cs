@@ -133,15 +133,14 @@ public static class Program
                 var psi = new ProcessStartInfo
                 {
                     FileName = packagePath,
-                    Arguments = $"/SILENT /SP- /NORESTART /DIR=\"{targetDir}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
+                    Arguments = $"/SILENT /SP- /NORESTART /CLOSEAPPLICATIONS /DIR=\"{targetDir}\"",
+                    UseShellExecute = true
                 };
 
                 using var installerProc = Process.Start(psi);
                 if (installerProc != null)
                 {
-                    installerProc.WaitForExit(60000);
+                    installerProc.WaitForExit(120000);
                     if (installerProc.ExitCode == 0)
                     {
                         updateApplied = true;

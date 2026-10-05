@@ -2,10 +2,10 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
+using Microsoft.Web.WebView2.Core;
 using SecApper.FolderLocker.Services;
-using SecApper.FolderLocker.ViewModels;
-using SecApper.FolderLocker.Views;
 using SecApper.Security.Data;
 using SecApper.Security.Models;
 using SecApper.Security.Ransomware;
@@ -18,61 +18,70 @@ namespace SecApper.FolderLocker;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _viewModel;
-    private readonly SystemTrayService _trayService;
-    private readonly ILockedFolderAccessMonitorService _accessMonitor;
     private readonly IDatabaseService _db;
+    private readonly IPasswordService _passwordService;
+    private readonly IMasterPinService _masterPinService;
+    private readonly IAclService _aclService;
+    private readonly IPermissionBackupService _backupService;
+    private readonly IFolderIconService _iconService;
+    private readonly IFolderLockService _lockService;
+    private readonly IRecoveryService _recoveryService;
+    private readonly IThreatScoringService _threatScorer;
+    private readonly IProcessMonitorService _processMonitor;
+    private readonly IRansomwareProtectionService _ransomwareService;
+    private readonly IFolderPathValidator _pathValidator;
+    private readonly IExplorerIntegrationService _explorerService;
+    private readonly SystemTrayService _trayService;
+    private readonly IUpdateService _updateService;
+    private readonly ILockedFolderAccessMonitorService _accessMonitor;
+    private VueBridgeController? _bridge;
     private bool _isExplicitExit;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        // Instantiate services
+        // 1. Initialize Real Security Backend
         _db = new SqliteDatabaseService();
-        var passwordService = new PasswordService();
-        var masterPinService = new MasterPinService(_db, passwordService);
-        var aclService = new AclService();
-        var backupService = new PermissionBackupService(aclService, _db);
-        var iconService = new FolderIconService();
-        var lockService = new FolderLockService(_db, aclService, backupService, passwordService, iconService, masterPinService);
-        var recoveryService = new RecoveryService(_db, aclService, iconService);
-        var threatScorer = new ThreatScoringService();
-        var processMonitor = new ProcessMonitorService();
-        var ransomwareService = new RansomwareProtectionService(_db, lockService, threatScorer, processMonitor);
-        var pathValidator = new FolderPathValidator(AppDomain.CurrentDomain.BaseDirectory, Path.GetDirectoryName(_db.DatabasePath));
-        var explorerService = new ExplorerIntegrationService();
+        _passwordService = new PasswordService();
+        _masterPinService = new MasterPinService(_db, _passwordService);
+        _aclService = new AclService();
+        _backupService = new PermissionBackupService(_aclService, _db);
+        _iconService = new FolderIconService();
+        _lockService = new FolderLockService(_db, _aclService, _backupService, _passwordService, _iconService, _masterPinService);
+        _recoveryService = new RecoveryService(_db, _aclService, _iconService);
+        _threatScorer = new ThreatScoringService();
+        _processMonitor = new ProcessMonitorService();
+        _ransomwareService = new RansomwareProtectionService(_db, _lockService, _threatScorer, _processMonitor);
+        _pathValidator = new FolderPathValidator(AppDomain.CurrentDomain.BaseDirectory, Path.GetDirectoryName(_db.DatabasePath));
+        _explorerService = new ExplorerIntegrationService();
         _trayService = new SystemTrayService();
-        var updateService = new UpdateService(_db);
+        _updateService = new UpdateService(_db);
 
-        // Ensure Windows Explorer context menus ("🔓 Unlock with SecApper") are registered
+        // Ensure Windows Explorer context menus are active
         try
         {
-            explorerService.EnableContextMenu();
+            _explorerService.EnableContextMenu();
         }
         catch
         {
         }
 
-        _viewModel = new MainViewModel(
-            _db,
-            lockService,
-            recoveryService,
-            ransomwareService,
-            pathValidator,
-            passwordService,
-            explorerService,
-            _trayService,
-            updateService,
-            masterPinService);
-
-        DataContext = _viewModel;
-
-        // Initialize active access monitor to intercept double-click attempts in Windows Explorer
+        // 2. Active Explorer Double-Click Interceptor
         _accessMonitor = new LockedFolderAccessMonitorService(_db, action => Dispatcher.Invoke(action));
-        _accessMonitor.FolderUnlockRequested += async folder =>
+        _accessMonitor.FolderUnlockRequested += folder =>
         {
-            await _viewModel.PromptUnlockForFolderAsync(folder);
+            Dispatcher.Invoke(() =>
+            {
+                RestoreWindow();
+                _bridge?.SendEvent("unlockRequested", new
+                {
+                    id = folder.Id,
+                    folderPath = folder.FolderPath,
+                    folderName = folder.FolderName,
+                    status = folder.Status.ToString()
+                });
+            });
         };
 
         _trayService.OpenRequested += RestoreWindow;
@@ -82,35 +91,69 @@ public partial class MainWindow : Window
             Close();
         };
 
-        Loaded += async (s, e) =>
-        {
-            // Prompt for Master PIN setup on fresh installation if not yet configured
-            if (!await masterPinService.IsMasterPinConfiguredAsync())
-            {
-                var setupDialog = new SetupMasterPinDialog(masterPinService)
-                {
-                    Owner = this,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner
-                };
-
-                bool? setupResult = setupDialog.ShowDialog();
-                if (setupResult != true && !await masterPinService.IsMasterPinConfiguredAsync())
-                {
-                    _isExplicitExit = true;
-                    System.Windows.Application.Current.Shutdown();
-                    return;
-                }
-            }
-
-            await _viewModel.InitializeAsync();
-            _accessMonitor.Start();
-
-            // Check if application was launched with a folder path or --unlock argument
-            await HandleCommandLineArgsAsync();
-        };
+        Loaded += MainWindow_Loaded;
     }
 
-    private async System.Threading.Tasks.Task HandleCommandLineArgsAsync()
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            // Initialize WebView2
+            await webView.EnsureCoreWebView2Async();
+
+            _bridge = new VueBridgeController(
+                this,
+                webView,
+                _db,
+                _lockService,
+                _recoveryService,
+                _ransomwareService,
+                _updateService,
+                _masterPinService,
+                _passwordService,
+                _pathValidator,
+                _trayService);
+
+            // Connect WebView2 IPC message listener
+            webView.CoreWebView2.WebMessageReceived += async (s, args) =>
+            {
+                await _bridge.HandleMessageAsync(args.WebMessageAsJson);
+            };
+
+            // Map Virtual Host to the built Vue 3 / Vite assets
+            string wwwrootDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "wwwroot");
+            if (Directory.Exists(wwwrootDir))
+            {
+                webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "app.secapper.local",
+                    wwwrootDir,
+                    CoreWebView2HostResourceAccessKind.Allow);
+
+                webView.Source = new Uri("https://app.secapper.local/index.html");
+            }
+            else
+            {
+                // Development fallback URL
+                webView.Source = new Uri("http://localhost:5173/");
+            }
+
+            // Start background monitor services
+            _accessMonitor.Start();
+
+            // Handle CLI args (e.g. Explorer right click --unlock <path>)
+            await HandleCommandLineArgsAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(
+                $"Error initializing SecApper interface:\n{ex.Message}",
+                "SecApper Security",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async Task HandleCommandLineArgsAsync()
     {
         try
         {
@@ -131,7 +174,13 @@ public partial class MainWindow : Window
                                                             f.FolderPath.TrimEnd('\\').Equals(targetPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
                     if (folder != null && folder.Status == FolderStatus.Locked)
                     {
-                        await _viewModel.PromptUnlockForFolderAsync(folder);
+                        _bridge?.SendEvent("unlockRequested", new
+                        {
+                            id = folder.Id,
+                            folderPath = folder.FolderPath,
+                            folderName = folder.FolderName,
+                            status = folder.Status.ToString()
+                        });
                     }
                 }
             }
@@ -152,10 +201,12 @@ public partial class MainWindow : Window
     {
         if (!_isExplicitExit)
         {
-            // Minimize to system tray instead of exiting immediately so double-click interception and ransomware protection stay active
+            // Minimize to system tray instead of exiting so double-click interception and ransomware monitoring remain active
             e.Cancel = true;
             Hide();
-            _trayService.ShowNotification("SecApper Folder Locker", "Application running in background. Double-click unlock popup and folder security are active.");
+            _trayService.ShowNotification(
+                "SecApper Folder Locker",
+                "Protection active in background. Double-click unlock popup and folder security are running.");
             return;
         }
 

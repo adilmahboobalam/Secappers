@@ -7,7 +7,7 @@
         ResizeMode="NoResize"
         Background="#F7F9FC"
         Foreground="#172033"
-        Icon="../Resources/app.ico">
+        Icon="pack://application:,,,/Resources/app.ico">
 
     <Grid Margin="32">
         <Grid.RowDefinitions>

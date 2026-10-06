@@ -7,7 +7,7 @@
         MinHeight="700" MinWidth="1100"
         WindowStartupLocation="CenterScreen"
         Background="#091D38"
-        Icon="Resources/app.ico">
+        Icon="pack://application:,,,/Resources/app.ico">
     <Grid Background="#091D38">
         <wv2:WebView2 x:Name="webView" />
     </Grid>

@@ -49,6 +49,13 @@ public partial class MainWindow : Window
 
         // 1. Initialize Real Security Backend
         _db = new SqliteDatabaseService();
+        try
+        {
+            _db.InitializeAsync().GetAwaiter().GetResult();
+        }
+        catch
+        {
+        }
         _passwordService = new PasswordService();
         _masterPinService = new MasterPinService(_db, _passwordService);
         _aclService = new AclService();

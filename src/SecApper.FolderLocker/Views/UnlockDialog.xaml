@@ -7,7 +7,7 @@
         ResizeMode="NoResize"
         Background="#F8FAFC"
         Foreground="#172033"
-        Icon="../Resources/app.ico"
+        Icon="pack://application:,,,/Resources/app.ico"
         Topmost="True"
         ShowInTaskbar="True">
     <Window.Resources>

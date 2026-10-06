@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useSecurityStore } from '../../stores/security';
 import { useUserStore } from '../../stores/user';
 import { nativeBridge } from '../../services/nativeBridge';
 import shieldUrl from '../../assets/branding/secapper-shield.png';
 import { Minus, Square, X, WifiOff, Shield } from 'lucide-vue-next';
 
+const router = useRouter();
 const securityStore = useSecurityStore();
 const userStore = useUserStore();
 
@@ -46,9 +48,9 @@ function handleClose() {
     <div class="flex items-center gap-3 app-no-drag">
       <!-- Dynamic User Chip -->
       <button
-        @click="userStore.relaunchSetup"
+        @click="router.push('/settings')"
         class="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F2F4F7] hover:bg-[#E4E7EC] dark:bg-[#1E293B] dark:hover:bg-[#2A3F60] text-[#344054] dark:text-[#E2E8F0] border border-[#E4E7EC] dark:border-[#334155] transition-all cursor-pointer"
-        title="SecApper Dynamic Profile - Click to customize"
+        title="SecApper Dynamic Profile - Click to view in Settings"
       >
         <div class="w-3.5 h-3.5 rounded-full bg-[#122D55] text-white flex items-center justify-center text-[9px] font-bold">
           {{ userName.charAt(0).toUpperCase() }}

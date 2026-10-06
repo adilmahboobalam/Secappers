@@ -219,9 +219,9 @@ function isActive(path: string) {
 
     <!-- Dynamic User Profile Card -->
     <div
-      @click="userStore.relaunchSetup"
+      @click="navigate('/settings')"
       class="mx-2.5 mb-2 p-2.5 rounded-lg bg-[#081A33] hover:bg-[#0D2447] border border-[#163863] cursor-pointer transition-colors group select-none shadow-sm"
-      title="SecApper Dynamic Profile - Click to customize"
+      title="SecApper Dynamic Profile - Click to view in Settings"
     >
       <div class="flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#122D55] to-[#1E4E8C] border border-[#2D68B2] flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0">

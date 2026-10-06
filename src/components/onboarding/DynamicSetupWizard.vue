@@ -22,6 +22,7 @@ import {
   EyeOff,
   Flame,
   Award,
+  X,
 } from 'lucide-vue-next';
 import { useUserStore } from '../../stores/user';
 import { useFolderStore } from '../../stores/folders';
@@ -278,23 +279,33 @@ async function handleCompleteSetup() {
           </div>
         </div>
 
-        <!-- Step Indicator -->
-        <div class="flex items-center gap-1.5 self-center sm:self-auto bg-[#061426] p-1.5 rounded-lg border border-[#14325C]">
-          <div
-            v-for="s in [1, 2, 3, 4]"
-            :key="s"
-            :class="[
-              'w-7 h-7 rounded-md flex items-center justify-center text-xs font-semibold transition-all duration-200',
-              step === s
-                ? 'bg-[#C5202B] text-white shadow-md shadow-red-950/50 scale-105'
-                : step > s
-                ? 'bg-[#122D55] text-blue-300'
-                : 'text-[#64748B] hover:text-[#94A3B8]'
-            ]"
-          >
-            <Check v-if="step > s" class="w-3.5 h-3.5" />
-            <span v-else>{{ s }}</span>
+        <!-- Step Indicator & Dismiss Action -->
+        <div class="flex items-center gap-2 self-center sm:self-auto">
+          <div class="flex items-center gap-1.5 bg-[#061426] p-1.5 rounded-lg border border-[#14325C]">
+            <div
+              v-for="s in [1, 2, 3, 4]"
+              :key="s"
+              :class="[
+                'w-7 h-7 rounded-md flex items-center justify-center text-xs font-semibold transition-all duration-200',
+                step === s
+                  ? 'bg-[#C5202B] text-white shadow-md shadow-red-950/50 scale-105'
+                  : step > s
+                  ? 'bg-[#122D55] text-blue-300'
+                  : 'text-[#64748B] hover:text-[#94A3B8]'
+              ]"
+            >
+              <Check v-if="step > s" class="w-3.5 h-3.5" />
+              <span v-else>{{ s }}</span>
+            </div>
           </div>
+
+          <button
+            @click="userStore.skipSetup"
+            class="p-2 rounded-lg text-[#94A3B8] hover:text-white hover:bg-[#122D55] transition-colors border border-transparent hover:border-[#1E4E8C]"
+            title="Skip and do not show again"
+          >
+            <X class="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -701,7 +712,7 @@ async function handleCompleteSetup() {
 
       <!-- Footer Buttons -->
       <div class="px-6 py-4 border-t border-[#14325C] flex items-center justify-between bg-[#0A1D38]/50">
-        <div>
+        <div class="flex items-center gap-2">
           <button
             v-if="step > 1"
             @click="step--"
@@ -710,6 +721,14 @@ async function handleCompleteSetup() {
           >
             <ArrowLeft class="w-3.5 h-3.5" />
             <span>Back</span>
+          </button>
+
+          <button
+            @click="userStore.skipSetup"
+            :disabled="isSubmitting"
+            class="px-3 py-2 rounded-xl text-xs font-medium text-[#64748B] hover:text-[#94A3B8] transition-colors"
+          >
+            Skip Setup
           </button>
         </div>
 

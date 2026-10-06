@@ -599,7 +599,21 @@ public class VueBridgeController
             case "setup.isCompleted":
             {
                 string? completed = await _db.GetSettingAsync("SetupCompleted", "false");
-                return string.Equals(completed, "true", StringComparison.OrdinalIgnoreCase);
+                if (string.Equals(completed, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                // If user already has a Master PIN configured or has folders, setup is already completed (one-time only)
+                bool hasPin = await _masterPinService.IsMasterPinConfiguredAsync();
+                var folders = await _db.GetAllFoldersAsync();
+                if (hasPin || folders.Count > 0)
+                {
+                    await _db.SetSettingAsync("SetupCompleted", "true");
+                    return true;
+                }
+
+                return false;
             }
 
             case "setup.getInitialData":

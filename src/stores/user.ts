@@ -25,6 +25,17 @@ export const useUserStore = defineStore('user', () => {
   async function checkSetupStatus() {
     loading.value = true;
     try {
+      // 1. Strictly one-time check: If already completed locally, never show setup wizard again
+      const localCompleted = typeof localStorage !== 'undefined' && localStorage.getItem('secapper_setup_completed') === 'true';
+      if (localCompleted) {
+        isSetupCompleted.value = true;
+        showSetupWizard.value = false;
+        profile.value.isCompleted = true;
+        await loadProfile();
+        return;
+      }
+
+      // 2. Check native backend persistence
       const completed = await nativeBridge.setup.isCompleted();
       isSetupCompleted.value = completed;
       profile.value.isCompleted = completed;
@@ -32,10 +43,15 @@ export const useUserStore = defineStore('user', () => {
         showSetupWizard.value = true;
         await fetchInitialData();
       } else {
+        showSetupWizard.value = false;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('secapper_setup_completed', 'true');
+        }
         await loadProfile();
       }
     } catch (err: any) {
       console.warn('Could not check setup status:', err);
+      showSetupWizard.value = false;
     } finally {
       loading.value = false;
     }
@@ -75,6 +91,10 @@ export const useUserStore = defineStore('user', () => {
         throw new Error(result.error || 'Failed to complete setup configuration.');
       }
 
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('secapper_setup_completed', 'true');
+      }
+
       await loadProfile();
       isSetupCompleted.value = true;
       showSetupWizard.value = false;
@@ -93,6 +113,29 @@ export const useUserStore = defineStore('user', () => {
       throw err;
     } finally {
       loading.value = false;
+    }
+  }
+
+  async function skipSetup() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('secapper_setup_completed', 'true');
+    }
+    isSetupCompleted.value = true;
+    showSetupWizard.value = false;
+
+    try {
+      await nativeBridge.setup.complete({
+        userName: profile.value.userName || 'Security User',
+        userRole: profile.value.userRole || 'Security Administrator',
+        avatar: profile.value.avatar || 'sentinel',
+        securityTier: 'Standard',
+        recoveryCode: '',
+        darkMode: true,
+        ransomwareThreshold: 30,
+        autoLockOnWindowClose: true,
+      });
+    } catch (err) {
+      console.warn('Skip setup save notice:', err);
     }
   }
 
@@ -123,6 +166,7 @@ export const useUserStore = defineStore('user', () => {
     fetchInitialData,
     loadProfile,
     completeSetup,
+    skipSetup,
     updateProfile,
     relaunchSetup,
   };

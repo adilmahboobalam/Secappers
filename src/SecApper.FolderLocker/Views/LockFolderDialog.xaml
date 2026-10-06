@@ -7,7 +7,7 @@
         ResizeMode="NoResize"
         Background="#F7F9FC"
         Foreground="#172033"
-        Icon="pack://application:,,,/Resources/app.ico">
+        Icon="pack://application:,,,/SecApper.FolderLocker;component/Resources/app.ico">
 
     <Grid Margin="28">
         <Grid.RowDefinitions>
@@ -24,7 +24,7 @@
         <!-- Top Header with Official Logo -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16" HorizontalAlignment="Center">
             <Border Background="#FFFFFF" CornerRadius="8" Padding="10,6" Margin="0,0,0,10" BorderBrush="#E5E9F0" BorderThickness="1" HorizontalAlignment="Center">
-                <Image Source="pack://application:,,,/Resources/logo.png" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Image Source="pack://application:,,,/SecApper.FolderLocker;component/Resources/logo.png" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
             <TextBlock Text="Lock Folder?" FontSize="18" FontWeight="Bold" Foreground="#122D55" HorizontalAlignment="Center" />
             <TextBlock Text="This folder will be protected using Windows security permissions." FontSize="12" Foreground="#667085" HorizontalAlignment="Center" Margin="0,3,0,0" />

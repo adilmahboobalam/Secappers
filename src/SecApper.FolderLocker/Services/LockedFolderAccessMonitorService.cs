@@ -96,7 +96,9 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
     {
         EnumWindows((hWnd, lParam) =>
         {
-            if (!IsWindowVisible(hWnd)) return true;
+            try
+            {
+                if (!IsWindowVisible(hWnd)) return true;
 
             var sbClass = new StringBuilder(256);
             GetClassName(hWnd, sbClass, sbClass.Capacity);
@@ -240,6 +242,16 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 {
                     matches = true;
                 }
+                else if (lockedFolders.Count == 1 && (isPermissionOrDeniedDialog || hasDirectUi || isExplorer))
+                {
+                    if (title.Contains("Location", StringComparison.OrdinalIgnoreCase) ||
+                        title.Contains("available", StringComparison.OrdinalIgnoreCase) ||
+                        title.Contains("Access", StringComparison.OrdinalIgnoreCase) ||
+                        allText.Contains("Location", StringComparison.OrdinalIgnoreCase))
+                    {
+                        matches = true;
+                    }
+                }
 
                 if (matches)
                 {
@@ -267,7 +279,12 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
             }
 
             return true;
-        }, IntPtr.Zero);
+        }
+        catch
+        {
+            return true;
+        }
+    }, IntPtr.Zero);
     }
 
     private static void DismissDialog(IntPtr hWnd)

@@ -7,7 +7,7 @@
         ResizeMode="NoResize"
         Background="#F7F9FC"
         Foreground="#172033"
-        Icon="pack://application:,,,/Resources/app.ico">
+        Icon="pack://application:,,,/SecApper.FolderLocker;component/Resources/app.ico">
 
     <Grid Margin="32">
         <Grid.RowDefinitions>
@@ -24,7 +24,7 @@
         <!-- Top Header with Official Logo -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16" HorizontalAlignment="Center">
             <Border Background="#FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,0,12" BorderBrush="#E5E9F0" BorderThickness="1" HorizontalAlignment="Center">
-                <Image Source="pack://application:,,,/Resources/logo.png" Height="52" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Image Source="pack://application:,,,/SecApper.FolderLocker;component/Resources/logo.png" Height="52" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
             <TextBlock Text="Welcome to SecApper" FontSize="20" FontWeight="Bold" Foreground="#122D55" HorizontalAlignment="Center" />
             <TextBlock Text="Create your Master Security PIN for this installation." FontSize="13" Foreground="#667085" HorizontalAlignment="Center" Margin="0,3,0,0" />
@@ -37,7 +37,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Image Source="pack://application:,,,/Resources/shield.png" Width="24" Height="24" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Image Source="pack://application:,,,/SecApper.FolderLocker;component/Resources/shield.png" Width="24" Height="24" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
                 <TextBlock Grid.Column="1" FontSize="12" Foreground="#1E3A8A" LineHeight="17" VerticalAlignment="Center">
                     <Run FontWeight="Bold" Text="Master Key Access: " />
                     <Run Text="Your Master PIN can unlock any folder on this machine, safeguarding your files if you ever forget a specific folder password." />

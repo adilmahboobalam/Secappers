@@ -7,7 +7,7 @@
         ResizeMode="NoResize"
         Background="#F8FAFC"
         Foreground="#172033"
-        Icon="pack://application:,,,/Resources/app.ico"
+        Icon="pack://application:,,,/SecApper.FolderLocker;component/Resources/app.ico"
         Topmost="True"
         ShowInTaskbar="True">
     <Window.Resources>
@@ -36,7 +36,7 @@
         <!-- Top SecApper Header with Official Logo -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16" HorizontalAlignment="Center">
             <Border Background="#FFFFFF" CornerRadius="12" Padding="14,8" Margin="0,0,0,12" BorderBrush="#E2E8F0" BorderThickness="1" HorizontalAlignment="Center">
-                <Image Source="pack://application:,,,/Resources/logo.png" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Image Source="pack://application:,,,/SecApper.FolderLocker;component/Resources/logo.png" Height="48" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
             <TextBlock Text="Unlock Protected Folder" FontSize="18" FontWeight="Bold" Foreground="#122D55" HorizontalAlignment="Center" />
             <TextBlock Text="Enter your folder password or Master PIN to unlock." FontSize="13" Foreground="#64748B" HorizontalAlignment="Center" Margin="0,3,0,0" />

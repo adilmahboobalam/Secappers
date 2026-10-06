@@ -126,7 +126,14 @@ public partial class MainWindow : Window
         {
             await Dispatcher.InvokeAsync(async () =>
             {
-                await PromptUnlockPopupAsync(folder);
+                try
+                {
+                    await PromptUnlockPopupAsync(folder);
+                }
+                catch (Exception ex)
+                {
+                    App.LogError("FolderUnlockRequested", ex);
+                }
             });
         };
         _accessMonitor.Start();

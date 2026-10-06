@@ -63,6 +63,32 @@ public class UnlockAndAutoLockTests : IDisposable
     }
 
     [Fact]
+    public void UnlockDialog_CanBeInstantiatedOnStaThread()
+    {
+        Exception? threadEx = null;
+        var t = new Thread(() =>
+        {
+            try
+            {
+                var dialog = new Views.UnlockDialog();
+                Assert.NotNull(dialog);
+            }
+            catch (Exception ex)
+            {
+                threadEx = ex;
+            }
+        });
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        t.Join();
+
+        if (threadEx != null)
+        {
+            throw new Exception($"UnlockDialog failed to instantiate: {threadEx}", threadEx);
+        }
+    }
+
+    [Fact]
     public void ExplorerWindowMonitorService_TrackAndUntrack_ManagesSessionsSafely()
     {
         using var monitor = new ExplorerWindowMonitorService(action => action());

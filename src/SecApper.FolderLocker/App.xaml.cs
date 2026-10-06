@@ -137,7 +137,7 @@ public partial class App : System.Windows.Application
         e.SetObserved();
     }
 
-    private static void LogError(string context, Exception ex)
+    public static void LogError(string context, Exception ex)
     {
         try
         {

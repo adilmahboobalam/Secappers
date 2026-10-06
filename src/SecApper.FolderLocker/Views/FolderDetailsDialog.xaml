@@ -7,7 +7,7 @@
         ResizeMode="NoResize"
         Background="#F7F9FC"
         Foreground="#172033"
-        Icon="pack://application:,,,/Resources/app.ico">
+        Icon="pack://application:,,,/SecApper.FolderLocker;component/Resources/app.ico">
     <Grid Margin="28">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

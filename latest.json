@@ -2,7 +2,7 @@
   "version": "1.1.1",
   "releaseDate": "2026-10-05",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "d987fa5f4d8eee013a80603ce8cf90970305902259926684b7651aa946e408ff",
+  "sha256": "652a2ea9af64192011265c28f5c7f23e1f0656a6b8b9ac228be25435788afed8",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
   "releaseNotes": "SecApper Live Update:\n• Dynamic first-run onboarding setup wizard and personalized user security profiles\n• Intercept Windows Explorer permission denial (TaskDialog & DirectUI) with centered Unlock dialog\n• Automatic re-lock when Windows Explorer folder window closes\n• Real-time Explorer window and tab tracking\n• Native NTFS Discretionary Access Control enforcement"

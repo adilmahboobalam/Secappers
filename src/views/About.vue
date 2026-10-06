@@ -18,13 +18,15 @@ const securityStore = useSecurityStore();
 
     <!-- Brand Card -->
     <div class="sec-card p-8 sm:p-10 text-center bg-white dark:bg-[#0F1E30] border border-[#E4E7EC] dark:border-[#1E293B]">
-      <!-- Official Logo exactly as supplied -->
+      <!-- Official Logo on dedicated pure white background -->
       <div class="flex justify-center mb-4">
-        <img
-          :src="logoUrl"
-          alt="SecApper — Secure Your World"
-          class="h-16 w-auto object-contain"
-        />
+        <div class="bg-white rounded-xl px-6 py-3 border border-slate-200 shadow-sm inline-flex items-center justify-center">
+          <img
+            :src="logoUrl"
+            alt="SecApper — Secure Your World"
+            class="h-14 w-auto object-contain"
+          />
+        </div>
       </div>
 
       <div class="text-xs font-bold uppercase tracking-[0.25em] text-[#122D55] dark:text-[#93C5FD] mb-2">

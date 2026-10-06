@@ -281,17 +281,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task HandleCommandLineArgsAsync()
+    public async Task HandleCommandLineArgsAsync(string[]? customArgs = null)
     {
         try
         {
-            string[] args = Environment.GetCommandLineArgs();
-            if (args.Length > 1)
+            string[] rawArgs = customArgs ?? Environment.GetCommandLineArgs();
+            // If customArgs came from e.Args, index 0 is first arg; if Environment, index 0 is exe path
+            var argsList = new List<string>(rawArgs);
+            if (customArgs == null && argsList.Count > 0)
             {
-                string targetPath = args[1];
-                if (targetPath.Equals("--unlock", StringComparison.OrdinalIgnoreCase) && args.Length > 2)
+                argsList.RemoveAt(0);
+            }
+
+            if (argsList.Count > 0)
+            {
+                string targetPath = argsList[0];
+                if (targetPath.Equals("--unlock", StringComparison.OrdinalIgnoreCase) && argsList.Count > 1)
                 {
-                    targetPath = args[2];
+                    targetPath = argsList[1];
                 }
 
                 targetPath = targetPath.Trim('\"');

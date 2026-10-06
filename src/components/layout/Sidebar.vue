@@ -105,15 +105,18 @@ function isActive(path: string) {
   <aside
     class="w-[250px] shrink-0 h-full flex flex-col justify-between bg-[#091D38] border-r border-[#102747] text-white select-none relative z-20"
   >
-    <!-- Brand Header -->
-    <div class="py-4 px-4 border-b border-[#122D55]/60 bg-[#06152A]/40">
-      <div class="flex items-center justify-center">
-        <!-- Official Logo supplied by brand -->
+    <!-- Brand Header with White Background for Official Logo -->
+    <div class="py-3 px-3.5 border-b border-[#122D55]/60 bg-[#06152A]/40">
+      <div
+        class="w-full bg-white rounded-xl px-3 py-2 flex items-center justify-center shadow-sm cursor-pointer transition-all hover:bg-slate-50 hover:shadow"
+        @click="navigate('/dashboard')"
+        title="SecApper — Secure Your World"
+      >
+        <!-- Official Logo supplied by brand on pure white background -->
         <img
           :src="logoUrl"
           alt="SecApper — Secure Your World"
-          class="h-9 max-w-full w-auto object-contain cursor-pointer transition-opacity hover:opacity-95"
-          @click="navigate('/dashboard')"
+          class="h-8 max-w-full w-auto object-contain"
         />
       </div>
     </div>

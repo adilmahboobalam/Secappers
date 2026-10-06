@@ -66,8 +66,8 @@ async function handleUnlock() {
       <!-- Premium Brand Header with Official Logo -->
       <div class="pt-7 pb-3 px-6">
         <div class="flex items-center justify-center mb-4">
-          <div class="px-4 py-2.5 rounded-xl bg-[#08182E] dark:bg-[#06152A] border border-[#14325C]/80 shadow-inner flex items-center justify-center">
-            <img :src="logoUrl" alt="SecApper — Secure Your World" class="h-7 w-auto max-w-[210px] object-contain drop-shadow-sm" />
+          <div class="px-5 py-2.5 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+            <img :src="logoUrl" alt="SecApper — Secure Your World" class="h-8 w-auto max-w-[210px] object-contain" />
           </div>
         </div>
 

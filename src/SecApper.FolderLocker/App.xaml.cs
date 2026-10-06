@@ -28,9 +28,16 @@ public partial class App : System.Windows.Application
         _singleInstanceMutex = new System.Threading.Mutex(true, MutexName, out bool isFirstInstance);
         if (!isFirstInstance)
         {
-            // Signal the already running instance (in tray or background) to show its window
+            // Signal the already running instance (in tray or background) to show its window or process arguments
             try
             {
+                if (e.Args.Length > 0)
+                {
+                    string pendingFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SecApper", "FolderLocker", "pending_command.txt");
+                    Directory.CreateDirectory(Path.GetDirectoryName(pendingFile)!);
+                    File.WriteAllLines(pendingFile, e.Args);
+                }
+
                 using var showEvent = System.Threading.EventWaitHandle.OpenExisting(EventName);
                 showEvent.Set();
             }
@@ -53,13 +60,33 @@ public partial class App : System.Windows.Application
                     try
                     {
                         _showWindowEvent.WaitOne();
-                        Dispatcher.Invoke(() =>
+
+                        string pendingFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SecApper", "FolderLocker", "pending_command.txt");
+                        string[]? pendingArgs = null;
+                        if (File.Exists(pendingFile))
                         {
-                            if (MainWindow != null)
+                            try
                             {
-                                MainWindow.Show();
-                                MainWindow.WindowState = WindowState.Normal;
-                                MainWindow.Activate();
+                                pendingArgs = File.ReadAllLines(pendingFile);
+                                File.Delete(pendingFile);
+                            }
+                            catch { }
+                        }
+
+                        Dispatcher.Invoke(async () =>
+                        {
+                            if (MainWindow is MainWindow mw)
+                            {
+                                if (pendingArgs != null && pendingArgs.Length > 0)
+                                {
+                                    await mw.HandleCommandLineArgsAsync(pendingArgs);
+                                }
+                                else
+                                {
+                                    mw.Show();
+                                    mw.WindowState = WindowState.Normal;
+                                    mw.Activate();
+                                }
                             }
                         });
                     }

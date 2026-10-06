@@ -54,6 +54,17 @@ public class FolderLockService : IFolderLockService
             folder.PasswordAlgorithm = hashResult.Algorithm;
             folder.PasswordIterations = hashResult.Iterations;
         }
+        else if ((folder.PasswordHash == null || folder.PasswordHash.Length == 0) && _masterPinService != null)
+        {
+            var masterCreds = await _masterPinService.GetMasterPinCredentialsAsync();
+            if (masterCreds != null)
+            {
+                folder.PasswordHash = masterCreds.Value.Hash;
+                folder.PasswordSalt = masterCreds.Value.Salt;
+                folder.PasswordAlgorithm = masterCreds.Value.Algorithm;
+                folder.PasswordIterations = masterCreds.Value.Iterations;
+            }
+        }
 
         // STATE: Transition to LOCKING
         folder.Status = FolderStatus.Locking;

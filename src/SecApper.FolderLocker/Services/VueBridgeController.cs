@@ -106,18 +106,22 @@ public class VueBridgeController
 
             case "folders.lock":
             {
-                string folderPath = payload.GetProperty("folderPath").GetString() ?? string.Empty;
-                string password = payload.GetProperty("password").GetString() ?? string.Empty;
+                string folderPath = payload.TryGetProperty("folderPath", out var fpProp) ? fpProp.GetString() ?? string.Empty : string.Empty;
+                string password = payload.TryGetProperty("password", out var pwProp) ? pwProp.GetString() ?? string.Empty : string.Empty;
 
-                var existingFolders = await _db.GetAllFoldersAsync();
-                var validation = _pathValidator.ValidatePath(folderPath, existingFolders.Select(f => f.FolderPath));
-                if (!validation.IsValid)
+                var existingFolder = await _db.GetFolderByPathAsync(folderPath);
+
+                // Only validate path uniqueness/validity if not already an existing registered folder
+                if (existingFolder == null)
                 {
-                    return new { success = false, error = validation.ErrorMessage };
+                    var existingFolders = await _db.GetAllFoldersAsync();
+                    var validation = _pathValidator.ValidatePath(folderPath, existingFolders.Select(f => f.FolderPath));
+                    if (!validation.IsValid)
+                    {
+                        return new { success = false, error = validation.ErrorMessage };
+                    }
                 }
 
-                // Check if folder is already registered
-                var existingFolder = await _db.GetFolderByPathAsync(folderPath);
                 FolderRecord folder;
 
                 if (existingFolder != null)
@@ -126,7 +130,36 @@ public class VueBridgeController
                 }
                 else
                 {
-                    var hashResult = _passwordService.HashPassword(password);
+                    byte[] hash;
+                    byte[] salt;
+                    string algorithm;
+                    int iterations;
+
+                    if (!string.IsNullOrEmpty(password))
+                    {
+                        var hashResult = _passwordService.HashPassword(password);
+                        hash = hashResult.Hash;
+                        salt = hashResult.Salt;
+                        algorithm = hashResult.Algorithm;
+                        iterations = hashResult.Iterations;
+                    }
+                    else
+                    {
+                        // Use Master PIN credentials
+                        var masterCreds = await _masterPinService.GetMasterPinCredentialsAsync();
+                        if (masterCreds != null)
+                        {
+                            hash = masterCreds.Value.Hash;
+                            salt = masterCreds.Value.Salt;
+                            algorithm = masterCreds.Value.Algorithm;
+                            iterations = masterCreds.Value.Iterations;
+                        }
+                        else
+                        {
+                            return new { success = false, error = "Please set up a Master PIN or enter a password to protect this folder." };
+                        }
+                    }
+
                     string name = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                     if (string.IsNullOrEmpty(name))
                     {
@@ -138,10 +171,10 @@ public class VueBridgeController
                         FolderPath = folderPath,
                         FolderName = name,
                         Status = FolderStatus.Unlocked,
-                        PasswordHash = hashResult.Hash,
-                        PasswordSalt = hashResult.Salt,
-                        PasswordAlgorithm = hashResult.Algorithm,
-                        PasswordIterations = hashResult.Iterations,
+                        PasswordHash = hash,
+                        PasswordSalt = salt,
+                        PasswordAlgorithm = algorithm,
+                        PasswordIterations = iterations,
                         ProtectionMode = ProtectionMode.LockedAndProtected
                     };
 
@@ -154,7 +187,7 @@ public class VueBridgeController
                     });
                 }
 
-                var lockResult = await _lockService.LockFolderAsync(folder.Id, password);
+                var lockResult = await _lockService.LockFolderAsync(folder.Id, string.IsNullOrEmpty(password) ? null : password);
                 if (lockResult.Success)
                 {
                     _explorerWindowMonitor?.UntrackFolder(folder.Id);

@@ -55,8 +55,15 @@ function handleOpenUnlock(folder: FolderRecord) {
 }
 
 async function handleLock(folder: FolderRecord) {
-  // If already locked, do nothing. If unlocked, prompt or relock
-  handleOpenUnlock(folder);
+  isBusy.value = true;
+  try {
+    await folderStore.lockFolder(folder.folderPath, '');
+    toast.success('Folder Locked', `"${folder.folderName}" is now locked.`);
+  } catch (err: any) {
+    toast.error('Unable to Lock Folder', err.message || 'Failed to lock folder.');
+  } finally {
+    isBusy.value = false;
+  }
 }
 
 function handleOpenFolder(folder: FolderRecord) {

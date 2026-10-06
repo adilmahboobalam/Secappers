@@ -154,4 +154,65 @@ public class MasterPinTests : IDisposable
             }
         }
     }
+
+    [Fact]
+    public async Task Folder_CanLockAndUnlock_UsingMasterPinWithoutCustomPassword()
+    {
+        string testFolder = Path.Combine(Path.GetTempPath(), $"secapper_nopwd_test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(testFolder);
+        File.WriteAllText(Path.Combine(testFolder, "test.txt"), "Protected Data");
+
+        try
+        {
+            await _masterPinService.SetMasterPinAsync("Pin5678");
+
+            var aclService = new AclService();
+            var backupService = new PermissionBackupService(aclService, _db);
+            var iconService = new FolderIconService();
+            var lockService = new FolderLockService(_db, aclService, backupService, _passwordService, iconService, _masterPinService);
+
+            // Create folder with NO password (simulating user locking with Master PIN)
+            var folder = new FolderRecord
+            {
+                FolderName = "NoPwdFolder",
+                FolderPath = testFolder,
+                Status = FolderStatus.Unlocked
+            };
+            await _db.AddFolderAsync(folder);
+
+            // Lock folder with NO password provided
+            var lockResult = await lockService.LockFolderAsync(folder.Id, null);
+            Assert.True(lockResult.Success, lockResult.ErrorMessage);
+
+            // Folder in DB should have been populated with Master PIN credentials
+            var lockedFolder = await _db.GetFolderByIdAsync(folder.Id);
+            Assert.NotNull(lockedFolder);
+            Assert.NotNull(lockedFolder!.PasswordHash);
+            Assert.True(lockedFolder.PasswordHash.Length > 0);
+            Assert.Equal(FolderStatus.Locked, lockedFolder.Status);
+
+            // Unlock attempt with wrong PIN should fail
+            var failResult = await lockService.UnlockFolderAsync(folder.Id, "Wrong123");
+            Assert.False(failResult.Success);
+
+            // Unlock attempt with Master PIN should succeed!
+            var unlockResult = await lockService.UnlockFolderAsync(folder.Id, "Pin5678");
+            Assert.True(unlockResult.Success, unlockResult.ErrorMessage);
+
+            var unlockedFolder = await _db.GetFolderByIdAsync(folder.Id);
+            Assert.NotNull(unlockedFolder);
+            Assert.Equal(FolderStatus.Unlocked, unlockedFolder!.Status);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(testFolder))
+                    Directory.Delete(testFolder, true);
+            }
+            catch
+            {
+            }
+        }
+    }
 }

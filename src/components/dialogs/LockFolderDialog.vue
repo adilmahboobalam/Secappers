@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useFolderStore } from '../../stores/folders';
 import { useToast } from '../../composables/useToast';
+import { nativeBridge } from '../../services/nativeBridge';
 import Button from '../common/Button.vue';
-import { Shield, Folder, Eye, EyeOff, Lock, CheckCircle2, AlertCircle } from 'lucide-vue-next';
+import { Shield, Folder, Eye, EyeOff, Lock, CheckCircle2, AlertCircle, KeyRound, Sparkles } from 'lucide-vue-next';
 
 interface Props {
   isOpen: boolean;
@@ -23,6 +24,7 @@ const folderStore = useFolderStore();
 const toast = useToast();
 
 const folderPath = ref(props.initialPath);
+const useMasterPin = ref(true);
 const password = ref('');
 const confirmPassword = ref('');
 const showPassword = ref(false);
@@ -50,6 +52,23 @@ async function handleProtect() {
     return;
   }
 
+  if (useMasterPin.value) {
+    loading.value = true;
+    try {
+      // Empty password signals the backend to use the configured Master PIN credentials
+      const locked = await folderStore.lockFolder(folderPath.value.trim(), '');
+      toast.success('Folder Protected', `"${folderName.value}" is now secured with your Master PIN.`);
+      emit('locked', locked);
+      emit('close');
+    } catch (err: any) {
+      errorMessage.value = err.message || 'Unable to apply Windows security permissions to this folder.';
+    } finally {
+      loading.value = false;
+    }
+    return;
+  }
+
+  // Custom password flow
   if (!password.value) {
     errorMessage.value = 'Please enter a password to secure this folder.';
     return;
@@ -68,7 +87,7 @@ async function handleProtect() {
   loading.value = true;
   try {
     const locked = await folderStore.lockFolder(folderPath.value.trim(), password.value);
-    toast.success('Folder Protected', `"${folderName.value}" is now secured with Windows permissions.`);
+    toast.success('Folder Protected', `"${folderName.value}" is now secured with your custom password.`);
     emit('locked', locked);
     emit('close');
   } catch (err: any) {
@@ -95,7 +114,7 @@ async function handleProtect() {
           <Shield class="w-6 h-6 stroke-[2]" />
         </div>
         <h3 class="text-lg font-bold text-[#101828] dark:text-[#F8FAFC]">
-          Protect this folder?
+          Protect Folder
         </h3>
         <p class="text-xs text-[#667085] dark:text-[#94A3B8] mt-1 leading-normal">
           SecApper will strip inheritance and apply native Windows NTFS Deny permissions.
@@ -125,17 +144,56 @@ async function handleProtect() {
           </div>
         </div>
 
-        <!-- Password Field -->
-        <div>
-          <label class="block text-xs font-semibold text-[#344054] dark:text-[#CBD5E1] mb-1.5">
-            Set Security Password
-          </label>
+        <!-- Master PIN Option (Default) -->
+        <div v-if="useMasterPin" class="p-3.5 rounded-xl bg-[#F0FDF4] dark:bg-[#064E3B]/20 border border-[#BBF7D0] dark:border-[#059669]/30">
+          <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-lg bg-[#12B76A]/10 text-[#12B76A] flex items-center justify-center shrink-0 mt-0.5">
+              <KeyRound class="w-4 h-4" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h4 class="text-xs font-bold text-[#065F46] dark:text-[#34D399]">
+                  Secured with Master PIN
+                </h4>
+                <span class="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-[#12B76A]/15 text-[#047857] dark:text-[#A7F3D0] px-1.5 py-0.5 rounded-full">
+                  <Sparkles class="w-2.5 h-2.5" /> Recommended
+                </span>
+              </div>
+              <p class="text-[11px] text-[#047857] dark:text-[#A7F3D0] mt-1 leading-relaxed">
+                This folder will be locked directly using your Master PIN. You won't need to create or remember a separate password.
+              </p>
+              <button
+                type="button"
+                @click="useMasterPin = false"
+                class="mt-2 text-[11px] font-semibold text-[#122D55] dark:text-[#93C5FD] hover:underline cursor-pointer"
+              >
+                Use a custom password instead →
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom Password Inputs (Optional) -->
+        <div v-else class="space-y-3 p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-[#06152A] border border-[#E2E8F0] dark:border-[#1E293B]">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-[#344054] dark:text-[#CBD5E1]">
+              Custom Password
+            </label>
+            <button
+              type="button"
+              @click="useMasterPin = true"
+              class="text-[11px] font-semibold text-[#12B76A] hover:underline cursor-pointer"
+            >
+              ← Use Master PIN instead
+            </button>
+          </div>
+
           <div class="relative">
             <input
               :type="showPassword ? 'text' : 'password'"
               v-model="password"
-              placeholder="Enter protection password"
-              class="w-full px-3 py-2 pr-10 text-xs bg-white dark:bg-[#06152A] border border-[#D0D5DD] dark:border-[#1E293B] rounded-lg text-[#101828] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#122D55]/30"
+              placeholder="Enter custom password"
+              class="w-full px-3 py-2 pr-10 text-xs bg-white dark:bg-[#0F1E30] border border-[#D0D5DD] dark:border-[#1E293B] rounded-lg text-[#101828] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#122D55]/30"
             />
             <button
               type="button"
@@ -146,20 +204,20 @@ async function handleProtect() {
               <Eye v-else class="w-4 h-4" />
             </button>
           </div>
-        </div>
 
-        <!-- Confirm Password Field -->
-        <div>
-          <label class="block text-xs font-semibold text-[#344054] dark:text-[#CBD5E1] mb-1.5">
-            Confirm Password
-          </label>
-          <input
-            :type="showPassword ? 'text' : 'password'"
-            v-model="confirmPassword"
-            placeholder="Confirm password"
-            class="w-full px-3 py-2 text-xs bg-white dark:bg-[#06152A] border border-[#D0D5DD] dark:border-[#1E293B] rounded-lg text-[#101828] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#122D55]/30"
-            @keyup.enter="handleProtect"
-          />
+          <!-- Confirm Password Field -->
+          <div>
+            <label class="block text-xs font-semibold text-[#344054] dark:text-[#CBD5E1] mb-1.5">
+              Confirm Custom Password
+            </label>
+            <input
+              :type="showPassword ? 'text' : 'password'"
+              v-model="confirmPassword"
+              placeholder="Confirm custom password"
+              class="w-full px-3 py-2 text-xs bg-white dark:bg-[#0F1E30] border border-[#D0D5DD] dark:border-[#1E293B] rounded-lg text-[#101828] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#122D55]/30"
+              @keyup.enter="handleProtect"
+            />
+          </div>
         </div>
 
         <!-- Error Message -->

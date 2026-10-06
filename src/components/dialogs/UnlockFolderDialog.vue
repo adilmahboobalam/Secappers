@@ -31,7 +31,7 @@ async function handleUnlock() {
   if (!props.folder) return;
 
   if (!password.value) {
-    errorMessage.value = 'Please enter your password.';
+    errorMessage.value = 'Please enter your Master PIN or password.';
     return;
   }
 
@@ -46,7 +46,7 @@ async function handleUnlock() {
     emit('close');
   } catch (err: any) {
     // Exact instruction: Never reveal sensitive security info
-    errorMessage.value = 'Incorrect password. Please try again.';
+    errorMessage.value = 'Incorrect Master PIN or password. Please try again.';
   } finally {
     loading.value = false;
   }
@@ -84,13 +84,13 @@ async function handleUnlock() {
       <div class="px-6 py-4 space-y-3">
         <div class="text-left">
           <label class="block text-xs font-semibold text-[#344054] dark:text-[#CBD5E1] mb-1.5">
-            Enter your password
+            Enter Master PIN or Password
           </label>
           <div class="relative">
             <input
               :type="showPassword ? 'text' : 'password'"
               v-model="password"
-              placeholder="••••••••••••"
+              placeholder="Enter Master PIN or password"
               autofocus
               class="w-full px-3 py-2.5 pr-10 text-sm bg-white dark:bg-[#06152A] border border-[#D0D5DD] dark:border-[#1E293B] rounded-lg text-[#101828] dark:text-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#122D55]/30 tracking-widest"
               @keyup.enter="handleUnlock"

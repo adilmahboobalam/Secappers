@@ -108,4 +108,31 @@ public class MasterPinService : IMasterPinService
         await SetMasterPinAsync(newPin);
         return (true, null);
     }
+
+    public async Task<(byte[] Hash, byte[] Salt, string Algorithm, int Iterations)?> GetMasterPinCredentialsAsync()
+    {
+        bool isConfigured = await IsMasterPinConfiguredAsync();
+        if (!isConfigured) return null;
+
+        string? hashB64 = await _db.GetSettingAsync(KeyHash);
+        string? saltB64 = await _db.GetSettingAsync(KeySalt);
+        string? algorithm = await _db.GetSettingAsync(KeyAlgorithm, PasswordService.DefaultAlgorithm);
+        string? iterStr = await _db.GetSettingAsync(KeyIterations, PasswordService.DefaultIterations.ToString());
+
+        if (string.IsNullOrWhiteSpace(hashB64) || string.IsNullOrWhiteSpace(saltB64))
+            return null;
+
+        try
+        {
+            byte[] storedHash = Convert.FromBase64String(hashB64);
+            byte[] salt = Convert.FromBase64String(saltB64);
+            int iterations = int.TryParse(iterStr, out var iters) ? iters : PasswordService.DefaultIterations;
+
+            return (storedHash, salt, algorithm ?? PasswordService.DefaultAlgorithm, iterations);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

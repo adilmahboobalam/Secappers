@@ -57,5 +57,15 @@ export interface SecapperBridge {
     maximize: () => void;
     close: () => void;
   };
+  setup: {
+    isCompleted: () => Promise<boolean>;
+    getInitialData: () => Promise<import('./index').SetupInitialData>;
+    complete: (payload: import('./index').CompleteSetupPayload) => Promise<{ success: boolean; error?: string }>;
+    reset: () => Promise<boolean>;
+  };
+  profile: {
+    get: () => Promise<import('./index').UserProfile>;
+    update: (payload: Partial<import('./index').UserProfile>) => Promise<{ success: boolean }>;
+  };
   on: (event: string, callback: (data: any) => void) => () => void;
 }

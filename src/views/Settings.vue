@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import PageHeader from '../components/layout/PageHeader.vue';
 import Button from '../components/common/Button.vue';
 import ConfirmationDialog from '../components/dialogs/ConfirmationDialog.vue';
 import { useSettingsStore } from '../stores/settings';
 import { useSecurityStore } from '../stores/security';
+import { useUserStore } from '../stores/user';
 import { nativeBridge } from '../services/nativeBridge';
 import { useToast } from '../composables/useToast';
 import {
@@ -19,20 +20,68 @@ import {
   Moon,
   Sun,
   Monitor,
+  User,
+  Cpu,
+  Award,
+  Sparkles,
+  Copy,
+  Check,
+  RotateCcw,
 } from 'lucide-vue-next';
+import type { SecurityTier } from '../types';
 
 const settingsStore = useSettingsStore();
 const securityStore = useSecurityStore();
+const userStore = useUserStore();
 const toast = useToast();
 
-const activeTab = ref<'General' | 'Security' | 'Ransomware' | 'Notifications' | 'Updates' | 'Privacy'>('General');
+const activeTab = ref<'General' | 'Profile' | 'Security' | 'Ransomware' | 'Notifications' | 'Updates' | 'Privacy'>('General');
 
 const showPinDialog = ref(false);
 const pinInput = ref('');
 const isPinSubmitting = ref(false);
 
+const copiedId = ref(false);
+const isProfileSaving = ref(false);
+const editUserName = ref(userStore.profile.userName);
+const editUserRole = ref(userStore.profile.userRole);
+const editSecurityTier = ref<SecurityTier>(userStore.profile.securityTier);
+
+watch(() => userStore.profile, (newProf) => {
+  if (newProf) {
+    editUserName.value = newProf.userName;
+    editUserRole.value = newProf.userRole;
+    editSecurityTier.value = newProf.securityTier;
+  }
+}, { immediate: true, deep: true });
+
+async function handleSaveProfile() {
+  isProfileSaving.value = true;
+  try {
+    await userStore.updateProfile({
+      userName: editUserName.value,
+      userRole: editUserRole.value,
+      securityTier: editSecurityTier.value,
+    });
+    toast.success('Profile Saved', 'Your dynamic security persona has been updated.');
+  } catch (err: any) {
+    toast.error('Update Failed', err.message);
+  } finally {
+    isProfileSaving.value = false;
+  }
+}
+
+async function copyInstallId() {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(userStore.profile.installationId || '');
+    copiedId.value = true;
+    setTimeout(() => (copiedId.value = false), 2000);
+  }
+}
+
 const tabs = [
   { id: 'General', label: 'General', icon: Sliders },
+  { id: 'Profile', label: 'Dynamic Profile', icon: User },
   { id: 'Security', label: 'Security & PIN', icon: Shield },
   { id: 'Ransomware', label: 'Ransomware Protection', icon: ShieldAlert },
   { id: 'Notifications', label: 'Notifications', icon: Bell },
@@ -159,6 +208,103 @@ async function handleSetupPin() {
                 ]"
               ></div>
             </button>
+          </div>
+        </div>
+
+        <!-- PROFILE TAB -->
+        <div v-if="activeTab === 'Profile'" class="sec-card p-6 bg-white dark:bg-[#0F1E30] space-y-6">
+          <div class="flex items-center justify-between pb-3 border-b border-[#F2F4F7] dark:border-[#1E293B]">
+            <div>
+              <h3 class="text-sm font-bold text-[#101828] dark:text-[#F8FAFC]">
+                Dynamic User Persona &amp; Installation
+              </h3>
+              <p class="text-xs text-[#667085] dark:text-[#94A3B8] mt-0.5">
+                Every installation of SecApper adapts dynamically to each user profile and hardware context.
+              </p>
+            </div>
+            <Button variant="secondary" size="sm" @click="userStore.relaunchSetup">
+              <template #icon><RotateCcw class="w-3.5 h-3.5" /></template>
+              Re-run Setup Wizard
+            </Button>
+          </div>
+
+          <!-- Unique Installation ID Card -->
+          <div class="p-3.5 rounded-xl bg-[#F8FAFC] dark:bg-[#061426] border border-[#EAECF0] dark:border-[#163765] flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <Cpu class="w-5 h-5 text-blue-500 shrink-0" />
+              <div>
+                <div class="text-[10px] text-[#667085] dark:text-[#94A3B8] uppercase font-bold tracking-wider">
+                  Unique Machine Installation ID
+                </div>
+                <div class="font-mono text-xs font-bold text-[#101828] dark:text-blue-200">
+                  {{ userStore.profile.installationId }}
+                </div>
+              </div>
+            </div>
+            <button
+              @click="copyInstallId"
+              class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-[#0F284B] border border-[#D0D5DD] dark:border-[#1D4A88] text-[#344054] dark:text-blue-200 hover:bg-[#F9FAFB] dark:hover:bg-[#163765] transition-colors"
+            >
+              <Check v-if="copiedId" class="w-3.5 h-3.5 text-emerald-500" />
+              <Copy v-else class="w-3.5 h-3.5" />
+              <span>{{ copiedId ? 'Copied' : 'Copy ID' }}</span>
+            </button>
+          </div>
+
+          <!-- Edit Profile Form -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-[#344054] dark:text-[#94A3B8] mb-1.5">
+                User Display Name
+              </label>
+              <input
+                v-model="editUserName"
+                type="text"
+                class="w-full px-3 py-2 text-xs rounded-lg border border-[#D0D5DD] dark:border-[#1E293B] bg-white dark:bg-[#06152A] text-[#101828] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#122D55]/30"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-[#344054] dark:text-[#94A3B8] mb-1.5">
+                Security Role
+              </label>
+              <input
+                v-model="editUserRole"
+                type="text"
+                class="w-full px-3 py-2 text-xs rounded-lg border border-[#D0D5DD] dark:border-[#1E293B] bg-white dark:bg-[#06152A] text-[#101828] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#122D55]/30"
+              />
+            </div>
+          </div>
+
+          <!-- Security Tier Preference -->
+          <div>
+            <label class="block text-xs font-medium text-[#344054] dark:text-[#94A3B8] mb-1.5">
+              Active Security Tier
+            </label>
+            <div class="grid grid-cols-3 gap-3">
+              <button
+                v-for="tier in (['Relaxed', 'Standard', 'Maximum'] as const)"
+                :key="tier"
+                type="button"
+                @click="editSecurityTier = tier"
+                :class="[
+                  'p-3 rounded-lg border text-left transition-all',
+                  editSecurityTier === tier
+                    ? 'border-[#122D55] bg-[#122D55]/5 dark:bg-[#122D55]/30 dark:border-blue-400 font-bold'
+                    : 'border-[#EAECF0] dark:border-[#1E293B] bg-white dark:bg-[#06152A] text-[#667085] dark:text-[#94A3B8]'
+                ]"
+              >
+                <div class="text-xs text-[#101828] dark:text-white">{{ tier }}</div>
+                <div class="text-[10px] text-[#667085] dark:text-[#94A3B8]">
+                  {{ tier === 'Maximum' ? 'Strict isolation' : tier === 'Relaxed' ? 'Developer' : 'Recommended' }}
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex justify-end pt-3 border-t border-[#F2F4F7] dark:border-[#1E293B]">
+            <Button variant="navy" size="md" :loading="isProfileSaving" @click="handleSaveProfile">
+              Save Persona
+            </Button>
           </div>
         </div>
 

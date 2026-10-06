@@ -16,6 +16,7 @@ import {
 import { useSecurityStore } from '../../stores/security';
 import { useFolderStore } from '../../stores/folders';
 import { useUpdateStore } from '../../stores/updates';
+import { useUserStore } from '../../stores/user';
 import logoUrl from '../../assets/branding/secapper-logo.png';
 
 const route = useRoute();
@@ -23,6 +24,7 @@ const router = useRouter();
 const securityStore = useSecurityStore();
 const folderStore = useFolderStore();
 const updateStore = useUpdateStore();
+const userStore = useUserStore();
 
 const currentVersion = computed(() => securityStore.status.version || '1.1.0');
 const hasUpdate = computed(() => updateStore.updateInfo.hasUpdate);
@@ -212,6 +214,28 @@ function isActive(path: string) {
             </span>
           </button>
         </nav>
+      </div>
+    </div>
+
+    <!-- Dynamic User Profile Card -->
+    <div
+      @click="userStore.relaunchSetup"
+      class="mx-2.5 mb-2 p-2.5 rounded-lg bg-[#081A33] hover:bg-[#0D2447] border border-[#163863] cursor-pointer transition-colors group select-none shadow-sm"
+      title="SecApper Dynamic Profile - Click to customize"
+    >
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#122D55] to-[#1E4E8C] border border-[#2D68B2] flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0">
+          {{ userStore.profile.userName ? userStore.profile.userName.charAt(0).toUpperCase() : 'U' }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-semibold text-white truncate group-hover:text-blue-200 transition-colors">
+            {{ userStore.profile.userName || 'Security User' }}
+          </div>
+          <div class="text-[10px] text-[#94A3B8] truncate flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>{{ userStore.profile.securityTier }} Defense</span>
+          </div>
+        </div>
       </div>
     </div>
 

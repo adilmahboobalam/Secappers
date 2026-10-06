@@ -1,11 +1,14 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using SecApper.FolderLocker.Services;
+using SecApper.FolderLocker.ViewModels;
+using SecApper.FolderLocker.Views;
 using SecApper.Security.Data;
 using SecApper.Security.Models;
 using SecApper.Security.Ransomware;
@@ -34,6 +37,9 @@ public partial class MainWindow : Window
     private readonly SystemTrayService _trayService;
     private readonly IUpdateService _updateService;
     private readonly ILockedFolderAccessMonitorService _accessMonitor;
+    private readonly IExplorerWindowMonitorService _explorerWindowMonitor;
+    private UnlockDialog? _activeUnlockDialog;
+    private string? _activeUnlockFolderId;
     private VueBridgeController? _bridge;
     private bool _isExplicitExit;
 
@@ -67,20 +73,53 @@ public partial class MainWindow : Window
         {
         }
 
-        // 2. Active Explorer Double-Click Interceptor
-        _accessMonitor = new LockedFolderAccessMonitorService(_db, action => Dispatcher.Invoke(action));
-        _accessMonitor.FolderUnlockRequested += folder =>
+        // 2. Active Explorer Window Tracking Service (Auto re-lock folder when Explorer window closes)
+        _explorerWindowMonitor = new ExplorerWindowMonitorService(action => Dispatcher.Invoke(action));
+        _explorerWindowMonitor.FolderWindowClosed += async (folderId, folderPath) =>
         {
-            Dispatcher.Invoke(() =>
+            try
             {
-                RestoreWindow();
-                _bridge?.SendEvent("unlockRequested", new
+                var folder = await _db.GetFolderByIdAsync(folderId);
+                if (folder == null || folder.Status == FolderStatus.Locked)
                 {
-                    id = folder.Id,
-                    folderPath = folder.FolderPath,
-                    folderName = folder.FolderName,
-                    status = folder.Status.ToString()
-                });
+                    return;
+                }
+
+                var lockResult = await _lockService.LockFolderAsync(folderId);
+                if (lockResult.Success)
+                {
+                    _trayService.ShowNotification(
+                        "SecApper Auto-Lock",
+                        $"Folder '{folder.FolderName}' has been automatically re-locked because its window was closed.");
+
+                    _bridge?.SendEvent("folderChanged", new
+                    {
+                        id = folder.Id,
+                        status = FolderStatus.Locked.ToString()
+                    });
+
+                    await _db.AddSecurityEventAsync(new SecurityEvent
+                    {
+                        FolderId = folder.Id,
+                        EventType = "AutoLockOnWindowClose",
+                        Severity = EventSeverity.Info,
+                        Description = $"Folder '{folder.FolderName}' automatically re-locked because its Windows Explorer window was closed.",
+                        ActionTaken = "Auto-Locked"
+                    });
+                }
+            }
+            catch
+            {
+            }
+        };
+
+        // 3. Active Explorer Double-Click Interceptor
+        _accessMonitor = new LockedFolderAccessMonitorService(_db, action => Dispatcher.Invoke(action));
+        _accessMonitor.FolderUnlockRequested += async folder =>
+        {
+            await Dispatcher.InvokeAsync(async () =>
+            {
+                await PromptUnlockPopupAsync(folder);
             });
         };
 
@@ -112,7 +151,8 @@ public partial class MainWindow : Window
                 _masterPinService,
                 _passwordService,
                 _pathValidator,
-                _trayService);
+                _trayService,
+                _explorerWindowMonitor);
 
             // Connect WebView2 IPC message listener
             webView.CoreWebView2.WebMessageReceived += async (s, args) =>
@@ -139,6 +179,7 @@ public partial class MainWindow : Window
 
             // Start background monitor services
             _accessMonitor.Start();
+            _explorerWindowMonitor.Start();
 
             // Handle CLI args (e.g. Explorer right click --unlock <path>)
             await HandleCommandLineArgsAsync();
@@ -150,6 +191,93 @@ public partial class MainWindow : Window
                 "SecApper Security",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
+        }
+    }
+
+    public async Task PromptUnlockPopupAsync(FolderRecord folder)
+    {
+        if (_activeUnlockDialog != null && _activeUnlockFolderId == folder.Id)
+        {
+            _activeUnlockDialog.Activate();
+            return;
+        }
+
+        var unlockVm = new UnlockDialogViewModel
+        {
+            FolderName = folder.FolderName,
+            FolderPath = folder.FolderPath
+        };
+
+        var dialog = new UnlockDialog
+        {
+            DataContext = unlockVm,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Topmost = true,
+            ShowInTaskbar = true
+        };
+
+        _activeUnlockDialog = dialog;
+        _activeUnlockFolderId = folder.Id;
+
+        dialog.ValidatePasswordAsync = async pwd =>
+        {
+            var latest = await _db.GetFolderByIdAsync(folder.Id);
+            if (latest == null) return "Folder record not found.";
+
+            bool ok = _passwordService.VerifyPassword(pwd, latest.PasswordHash, latest.PasswordSalt, latest.PasswordAlgorithm, latest.PasswordIterations);
+            if (!ok && _masterPinService != null)
+            {
+                ok = await _masterPinService.VerifyMasterPinAsync(pwd);
+            }
+
+            if (!ok)
+            {
+                return "Incorrect password or Master PIN.";
+            }
+
+            return null;
+        };
+
+        try
+        {
+            bool? result = dialog.ShowDialog();
+            if (result == true)
+            {
+                var unlockResult = await _lockService.UnlockFolderAsync(folder.Id, unlockVm.Password);
+                if (unlockResult.Success)
+                {
+                    _trayService.ShowNotification(
+                        "Folder Unlocked",
+                        $"'{folder.FolderName}' has been unlocked.");
+
+                    _bridge?.SendEvent("folderChanged", new
+                    {
+                        id = folder.Id,
+                        status = FolderStatus.Unlocked.ToString()
+                    });
+
+                    // Open folder in Windows Explorer
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = folder.FolderPath,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch
+                    {
+                    }
+
+                    // Track window to automatically re-lock when window closes!
+                    _explorerWindowMonitor.TrackFolderWindow(folder.Id, folder.FolderPath);
+                }
+            }
+        }
+        finally
+        {
+            _activeUnlockDialog = null;
+            _activeUnlockFolderId = null;
         }
     }
 
@@ -174,13 +302,7 @@ public partial class MainWindow : Window
                                                             f.FolderPath.TrimEnd('\\').Equals(targetPath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
                     if (folder != null && folder.Status == FolderStatus.Locked)
                     {
-                        _bridge?.SendEvent("unlockRequested", new
-                        {
-                            id = folder.Id,
-                            folderPath = folder.FolderPath,
-                            folderName = folder.FolderName,
-                            status = folder.Status.ToString()
-                        });
+                        await PromptUnlockPopupAsync(folder);
                     }
                 }
             }
@@ -202,6 +324,8 @@ public partial class MainWindow : Window
         _isExplicitExit = true;
         try { _accessMonitor.Stop(); } catch { }
         try { _accessMonitor.Dispose(); } catch { }
+        try { _explorerWindowMonitor.Stop(); } catch { }
+        try { _explorerWindowMonitor.Dispose(); } catch { }
         try { _trayService.Dispose(); } catch { }
         Close();
         Environment.Exit(0);
@@ -222,6 +346,8 @@ public partial class MainWindow : Window
 
         _accessMonitor.Stop();
         _accessMonitor.Dispose();
+        _explorerWindowMonitor.Stop();
+        _explorerWindowMonitor.Dispose();
         _trayService.Dispose();
         base.OnClosing(e);
     }

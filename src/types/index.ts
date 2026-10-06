@@ -125,3 +125,36 @@ export interface AppSettings {
   startWithWindows: boolean;
   minimizeToTray: boolean;
 }
+
+export type SecurityTier = 'Relaxed' | 'Standard' | 'Maximum';
+
+export interface UserProfile {
+  userName: string;
+  userRole: string;
+  avatar: string;
+  securityTier: SecurityTier;
+  installationId: string;
+  setupDate?: string;
+  isCompleted: boolean;
+}
+
+export interface SetupInitialData {
+  suggestedUsername: string;
+  machineName: string;
+  osVersion: string;
+  installationId: string;
+  hasMasterPin: boolean;
+}
+
+export interface CompleteSetupPayload {
+  userName: string;
+  userRole: string;
+  avatar: string;
+  securityTier: SecurityTier;
+  masterPin?: string;
+  darkMode: boolean;
+  autoLockOnWindowClose?: boolean;
+  ransomwareThreshold?: number;
+  recoveryCode: string;
+}
+

@@ -7,6 +7,9 @@ import type {
   RecoveryReport,
   UpdateInfo,
   AppSettings,
+  UserProfile,
+  SetupInitialData,
+  CompleteSetupPayload,
 } from '../types';
 
 type MessageHandler = (payload: any) => void;
@@ -229,6 +232,37 @@ class NativeBridgeService implements SecapperBridge {
     },
   };
 
+  // --- Dynamic Setup API ---
+  public setup = {
+    isCompleted: async (): Promise<boolean> => {
+      return this.sendNative<boolean>('setup.isCompleted');
+    },
+
+    getInitialData: async (): Promise<SetupInitialData> => {
+      return this.sendNative<SetupInitialData>('setup.getInitialData');
+    },
+
+    complete: async (payload: CompleteSetupPayload): Promise<{ success: boolean; error?: string }> => {
+      return this.sendNative<{ success: boolean; error?: string }>('setup.complete', payload);
+    },
+
+    reset: async (): Promise<boolean> => {
+      return this.sendNative<boolean>('setup.reset');
+    },
+  };
+
+  // --- User Profile API ---
+  public profile = {
+    get: async (): Promise<UserProfile> => {
+      return this.sendNative<UserProfile>('profile.get');
+    },
+
+    update: async (payload: Partial<UserProfile>): Promise<{ success: boolean }> => {
+      return this.sendNative<{ success: boolean }>('profile.update', payload);
+    },
+  };
+
+
   // --------------------------------------------------------------------------
   // BROWSER DEV FALLBACK (Active ONLY when running outside WebView2 during Vite dev)
   // --------------------------------------------------------------------------
@@ -246,6 +280,15 @@ class NativeBridgeService implements SecapperBridge {
     minimizeToTray: true,
   };
   private fallbackPin: string = '123456';
+  private fallbackProfile: UserProfile = {
+    userName: 'Security User',
+    userRole: 'Security Administrator',
+    avatar: 'shield-cyan',
+    securityTier: 'Standard',
+    installationId: 'SEC-8F92A1-4B29',
+    setupDate: new Date().toISOString(),
+    isCompleted: false,
+  };
 
   private initFallbackState() {
     const storedFolders = localStorage.getItem('secapper_dev_folders');
@@ -545,6 +588,76 @@ class NativeBridgeService implements SecapperBridge {
           return true as unknown as T;
         }
         return false as unknown as T;
+
+      case 'setup.isCompleted': {
+        if (typeof localStorage !== 'undefined') {
+          const completed = localStorage.getItem('secapper_setup_completed');
+          if (completed !== null) {
+            this.fallbackProfile.isCompleted = completed === 'true';
+          }
+        }
+        return this.fallbackProfile.isCompleted as unknown as T;
+      }
+
+      case 'setup.getInitialData': {
+        const initData: SetupInitialData = {
+          suggestedUsername: 'Security User',
+          machineName: 'DESKTOP-SECURE',
+          osVersion: 'Windows 11 Pro 64-bit',
+          installationId: this.fallbackProfile.installationId,
+          hasMasterPin: this.fallbackSettings.masterPinConfigured,
+        };
+        return initData as unknown as T;
+      }
+
+      case 'setup.complete': {
+        this.fallbackProfile.userName = payload.userName || this.fallbackProfile.userName;
+        this.fallbackProfile.userRole = payload.userRole || this.fallbackProfile.userRole;
+        this.fallbackProfile.avatar = payload.avatar || this.fallbackProfile.avatar;
+        this.fallbackProfile.securityTier = payload.securityTier || 'Standard';
+        this.fallbackProfile.isCompleted = true;
+        this.fallbackProfile.setupDate = new Date().toISOString();
+        if (payload.masterPin) {
+          this.fallbackPin = payload.masterPin;
+          this.fallbackSettings.masterPinConfigured = true;
+        }
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('secapper_setup_completed', 'true');
+          localStorage.setItem('secapper_profile', JSON.stringify(this.fallbackProfile));
+        }
+        return { success: true } as unknown as T;
+      }
+
+      case 'setup.reset': {
+        this.fallbackProfile.isCompleted = false;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.removeItem('secapper_setup_completed');
+        }
+        return true as unknown as T;
+      }
+
+      case 'profile.get': {
+        if (typeof localStorage !== 'undefined') {
+          const stored = localStorage.getItem('secapper_profile');
+          if (stored) {
+            try {
+              this.fallbackProfile = { ...this.fallbackProfile, ...JSON.parse(stored) };
+            } catch {}
+          }
+          if (localStorage.getItem('secapper_setup_completed') === 'true') {
+            this.fallbackProfile.isCompleted = true;
+          }
+        }
+        return { ...this.fallbackProfile } as unknown as T;
+      }
+
+      case 'profile.update': {
+        this.fallbackProfile = { ...this.fallbackProfile, ...payload };
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('secapper_profile', JSON.stringify(this.fallbackProfile));
+        }
+        return { success: true } as unknown as T;
+      }
 
       default:
         throw new Error(`Unknown action: ${action}`);

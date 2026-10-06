@@ -4,12 +4,14 @@ import Sidebar from './Sidebar.vue';
 import TopBar from './TopBar.vue';
 import Toast from '../common/Toast.vue';
 import UnlockFolderDialog from '../dialogs/UnlockFolderDialog.vue';
+import DynamicSetupWizard from '../onboarding/DynamicSetupWizard.vue';
 import { nativeBridge } from '../../services/nativeBridge';
 import { useSecurityStore } from '../../stores/security';
 import { useFolderStore } from '../../stores/folders';
 import { useEventStore } from '../../stores/events';
 import { useRansomwareStore } from '../../stores/ransomware';
 import { useSettingsStore } from '../../stores/settings';
+import { useUserStore } from '../../stores/user';
 import type { FolderRecord } from '../../types';
 
 const securityStore = useSecurityStore();
@@ -17,12 +19,16 @@ const folderStore = useFolderStore();
 const eventStore = useEventStore();
 const ransomwareStore = useRansomwareStore();
 const settingsStore = useSettingsStore();
+const userStore = useUserStore();
 
 // Double-click intercept unlock popup
 const interceptUnlockFolder = ref<FolderRecord | null>(null);
 const showInterceptUnlockDialog = ref(false);
 
 onMounted(async () => {
+  // Check dynamic setup status on startup
+  await userStore.checkSetupStatus();
+
   // Initial parallel sync with real backend
   await Promise.allSettled([
     securityStore.refreshStatus(),
@@ -80,5 +86,10 @@ onMounted(async () => {
       @close="showInterceptUnlockDialog = false"
       @unlocked="showInterceptUnlockDialog = false"
     />
+
+    <!-- Dynamic First-Run Setup & Personalization Wizard -->
+    <transition name="fade">
+      <DynamicSetupWizard v-if="userStore.showSetupWizard" />
+    </transition>
   </div>
 </template>

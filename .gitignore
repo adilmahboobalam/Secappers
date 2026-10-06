@@ -2,8 +2,8 @@
 bin/
 obj/
 publish/
-installer/output/*
-!installer/output/*.exe
+standalone/
+installer/output/
 TestResults/
 
 ## Visual Studio / IDE
@@ -27,3 +27,8 @@ $RECYCLE.BIN/
 ## Database local debug locks
 *.db-shm
 *.db-wal
+
+## Binaries & Logs
+*.exe
+*.pdb
+*.log

@@ -25,9 +25,9 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline
 DisableDirPage=no
 DisableProgramGroupPage=no
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
-CloseApplicationsFilter=SecApper.FolderLocker.exe
+CloseApplicationsFilter=SecApper.FolderLocker.exe,SecApper.Updater.exe
 RestartApplications=no
 
 [Languages]
@@ -38,7 +38,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "explorermenu"; Description: "Add 'Lock with SecApper' to Windows Explorer context menu"; GroupDescription: "Windows Explorer Integration:"
 
 [Files]
-Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs restartreplace
 Source: "..\src\SecApper.FolderLocker\Resources\app.ico"; DestDir: "{commonappdata}\SecApper\FolderLocker\icons"; DestName: "locked.ico"; Flags: ignoreversion
 
 [Icons]
@@ -56,6 +56,17 @@ Root: HKCU; Subkey: "Software\Classes\Directory\shell\SecApperFolderLocker\comma
 Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// Pre-installation cleanup: safely terminate existing instances to avoid file locks
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Exec('taskkill.exe', '/F /IM SecApper.FolderLocker.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('taskkill.exe', '/F /IM SecApper.Updater.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(500);
+  Result := '';
+end;
+
 // Safety check on uninstall to ensure user does not inadvertently leave protected folders without unlocking
 function InitializeUninstall(): Boolean;
 var

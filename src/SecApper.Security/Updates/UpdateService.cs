@@ -399,14 +399,15 @@ public class UpdateService : IUpdateService
 
         int currentPid = Environment.ProcessId;
         string exeName = "SecApper.FolderLocker.exe";
+        string cleanBaseDir = baseDir.TrimEnd('\\');
 
         if (File.Exists(updaterExe))
         {
             var psi = new ProcessStartInfo
             {
                 FileName = updaterExe,
-                Arguments = $"--caller-pid {currentPid} --package \"{packagePath}\" --target-dir \"{baseDir}\" --executable \"{exeName}\" --version \"{update.Version}\"",
-                WorkingDirectory = baseDir,
+                Arguments = $"--caller-pid {currentPid} --package \"{packagePath}\" --target-dir \"{cleanBaseDir}\" --executable \"{exeName}\" --version \"{update.Version}\"",
+                WorkingDirectory = cleanBaseDir,
                 UseShellExecute = true
             };
 
@@ -421,7 +422,7 @@ public class UpdateService : IUpdateService
                 var psi = new ProcessStartInfo
                 {
                     FileName = packagePath,
-                    Arguments = $"/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /FORCECLOSEAPPLICATIONS /CURRENTUSER /DIR=\"{baseDir}\"",
+                    Arguments = $"/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /FORCECLOSEAPPLICATIONS /DIR=\"{cleanBaseDir}\"",
                     UseShellExecute = true
                 };
 

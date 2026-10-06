@@ -48,11 +48,34 @@ public static class Program
         }
 
         targetDir = Path.GetFullPath(targetDir);
-        Log($"Target Directory: {targetDir}");
+        string cleanTargetDir = targetDir.TrimEnd('\\');
+
+        Log($"Target Directory: {cleanTargetDir}");
         Log($"Package: {packagePath}");
 
-        // Step 1: Forcefully terminate ALL running SecApper.FolderLocker instances to release all DLL file locks
+        // Step 1: Forcefully terminate ALL running SecApper instances to guarantee zero file locks
         Log("Terminating all active SecApper instances to ensure zero file locks...");
+
+        // A. Terminate specific caller process if provided
+        if (callerPid > 0)
+        {
+            try
+            {
+                var callerProc = Process.GetProcessById(callerPid);
+                if (!callerProc.HasExited)
+                {
+                    Log($"Terminating caller process PID {callerPid}...");
+                    try { callerProc.Kill(); } catch { }
+                    callerProc.WaitForExit(3000);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"Caller PID {callerPid} already exited or inaccessible: {ex.Message}");
+            }
+        }
+
+        // B. Terminate all SecApper.FolderLocker processes via standard Process.Kill()
         try
         {
             var runningProcs = Process.GetProcessesByName("SecApper.FolderLocker");
@@ -61,8 +84,8 @@ public static class Program
                 try
                 {
                     Log($"Terminating SecApper process PID {proc.Id}...");
-                    proc.Kill(true);
-                    proc.WaitForExit(5000);
+                    proc.Kill();
+                    proc.WaitForExit(3000);
                 }
                 catch (Exception pEx)
                 {
@@ -75,21 +98,21 @@ public static class Program
             Log($"Warning finding SecApper processes: {ex.Message}");
         }
 
-        if (callerPid > 0)
+        // C. Fallback: Run taskkill to ensure no lingering child processes keep DLLs locked
+        try
         {
-            try
+            using var tk = Process.Start(new ProcessStartInfo
             {
-                var proc = Process.GetProcessById(callerPid);
-                if (!proc.HasExited)
-                {
-                    proc.Kill(true);
-                    proc.WaitForExit(3000);
-                }
-            }
-            catch { }
+                FileName = "taskkill.exe",
+                Arguments = "/F /IM SecApper.FolderLocker.exe",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            });
+            tk?.WaitForExit(3000);
         }
+        catch { }
 
-        // Also terminate any lingering processes located inside targetDir
+        // D. Terminate any in-folder process
         try
         {
             foreach (var p in Process.GetProcesses())
@@ -98,11 +121,11 @@ public static class Program
                 {
                     if (p.Id != Environment.ProcessId &&
                         p.MainModule?.FileName != null &&
-                        p.MainModule.FileName.StartsWith(targetDir, StringComparison.OrdinalIgnoreCase))
+                        p.MainModule.FileName.StartsWith(cleanTargetDir, StringComparison.OrdinalIgnoreCase))
                     {
                         Log($"Terminating in-folder process {p.ProcessName} (PID {p.Id})...");
-                        p.Kill(true);
-                        p.WaitForExit(3000);
+                        p.Kill();
+                        p.WaitForExit(2000);
                     }
                 }
                 catch { }
@@ -110,17 +133,46 @@ public static class Program
         }
         catch { }
 
-        // Give file handles and child processes 2 seconds to release completely
-        Thread.Sleep(2000);
+        // E. Wait until all SecApper processes have completely exited
+        int waitAttempts = 0;
+        while (waitAttempts < 15)
+        {
+            var procs = Process.GetProcessesByName("SecApper.FolderLocker");
+            if (procs.Length == 0) break;
+            Thread.Sleep(500);
+            waitAttempts++;
+        }
+
+        // F. Verify target executable is unlocked and writable
+        string testExe = Path.Combine(cleanTargetDir, exeName);
+        if (File.Exists(testExe))
+        {
+            int lockCheck = 0;
+            while (lockCheck < 10)
+            {
+                try
+                {
+                    using var fs = File.Open(testExe, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                    Log("Target executable verified unlocked and writable.");
+                    break;
+                }
+                catch
+                {
+                    lockCheck++;
+                    Log($"Waiting for file lock on {testExe} to release ({lockCheck}/10)...");
+                    Thread.Sleep(500);
+                }
+            }
+        }
 
         // Step 2: Create atomic backup directory of existing application files
-        string backupDir = Path.Combine(targetDir, $"_backup_{DateTime.UtcNow:yyyyMMddHHmmss}");
+        string backupDir = Path.Combine(cleanTargetDir, $"_backup_{DateTime.UtcNow:yyyyMMddHHmmss}");
         bool backupCreated = false;
 
         try
         {
             Directory.CreateDirectory(backupDir);
-            foreach (var file in Directory.GetFiles(targetDir))
+            foreach (var file in Directory.GetFiles(cleanTargetDir))
             {
                 string fName = Path.GetFileName(file);
                 // Do not copy updater logs or previous backups
@@ -150,7 +202,7 @@ public static class Program
                 foreach (var entry in archive.Entries)
                 {
                     if (string.IsNullOrEmpty(entry.Name)) continue; // Directory entry
-                    string destPath = Path.Combine(targetDir, entry.FullName);
+                    string destPath = Path.Combine(cleanTargetDir, entry.FullName);
                     string? destFileDir = Path.GetDirectoryName(destPath);
                     if (!string.IsNullOrEmpty(destFileDir) && !Directory.Exists(destFileDir))
                     {
@@ -164,21 +216,25 @@ public static class Program
             else if (ext == ".exe")
             {
                 Log("Running installer in silent update mode...");
+                string innoLog = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "SecApper", "FolderLocker", "logs", "installer_exec.log");
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = packagePath,
-                    Arguments = $"/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /FORCECLOSEAPPLICATIONS /CURRENTUSER /DIR=\"{targetDir}\"",
+                    Arguments = $"/VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /FORCECLOSEAPPLICATIONS /DIR=\"{cleanTargetDir}\" /LOG=\"{innoLog}\"",
                     UseShellExecute = true
                 };
 
                 using var installerProc = Process.Start(psi);
                 if (installerProc != null)
                 {
-                    installerProc.WaitForExit(120000);
+                    installerProc.WaitForExit(180000);
                     if (installerProc.ExitCode == 0)
                     {
                         updateApplied = true;
-                        Log("Installer completed successfully.");
+                        Log("Installer completed successfully (exit code 0).");
                     }
                     else
                     {
@@ -194,7 +250,7 @@ public static class Program
         }
 
         // Step 4: Verify target executable exists
-        string mainExe = Path.Combine(targetDir, exeName);
+        string mainExe = Path.Combine(cleanTargetDir, exeName);
         if (!updateApplied || !File.Exists(mainExe))
         {
             Log("Update failed or main executable missing! Executing rollback...");
@@ -205,7 +261,7 @@ public static class Program
                     foreach (var file in Directory.GetFiles(backupDir))
                     {
                         string fName = Path.GetFileName(file);
-                        File.Copy(file, Path.Combine(targetDir, fName), true);
+                        File.Copy(file, Path.Combine(cleanTargetDir, fName), true);
                     }
                     Log("Rollback successful. Previous version restored.");
                 }
@@ -220,7 +276,7 @@ public static class Program
             Log($"Update applied successfully to version {version ?? "latest"}.");
         }
 
-        // Step 5: Launch the application
+        // Step 5: Launch the updated application
         if (File.Exists(mainExe))
         {
             try
@@ -229,7 +285,7 @@ public static class Program
                 var psi = new ProcessStartInfo
                 {
                     FileName = mainExe,
-                    WorkingDirectory = targetDir,
+                    WorkingDirectory = cleanTargetDir,
                     UseShellExecute = true
                 };
                 Process.Start(psi);
@@ -241,7 +297,7 @@ public static class Program
         }
 
         Log("=== SecApper Updater Completed ===");
-        return 0;
+        return updateApplied ? 0 : 1;
     }
 
     private static void Log(string message)

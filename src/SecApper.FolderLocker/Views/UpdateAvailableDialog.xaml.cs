@@ -84,7 +84,14 @@ public partial class UpdateAvailableDialog : Window
             bool launched = await _updateService.LaunchUpdaterAndExitAsync(downloadedPath, _updateInfo);
             if (launched)
             {
-                Application.Current.Shutdown();
+                if (Application.Current.MainWindow is MainWindow mw)
+                {
+                    mw.ShutdownApp();
+                }
+                else
+                {
+                    Environment.Exit(0);
+                }
             }
             else
             {

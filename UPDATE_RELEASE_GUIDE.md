@@ -45,8 +45,8 @@ dotnet test SecApperFolderLocker.sln
 ### Step 3: Publish Binaries
 Publish Release builds of both the main application and the updater:
 ```powershell
-dotnet publish src\SecApper.FolderLocker\SecApper.FolderLocker.csproj -c Release -o publish
-dotnet publish src\SecApper.Updater\SecApper.Updater.csproj -c Release -o publish
+dotnet publish src\SecApper.FolderLocker\SecApper.FolderLocker.csproj -c Release -r win-x64 --self-contained true -o publish
+dotnet publish src\SecApper.Updater\SecApper.Updater.csproj -c Release -r win-x64 --self-contained true -o publish
 ```
 
 ### Step 4: Generate Package & SHA-256 Checksum

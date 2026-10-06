@@ -30,6 +30,7 @@ public class VueBridgeController
     private readonly IPasswordService _passwordService;
     private readonly IFolderPathValidator _pathValidator;
     private readonly SystemTrayService _trayService;
+    private readonly IExplorerWindowMonitorService? _explorerWindowMonitor;
     private SecApper.Security.Updates.UpdateInfo? _lastUpdateInfo;
     private string? _downloadedPackagePath;
 
@@ -44,7 +45,8 @@ public class VueBridgeController
         IMasterPinService masterPinService,
         IPasswordService passwordService,
         IFolderPathValidator pathValidator,
-        SystemTrayService trayService)
+        SystemTrayService trayService,
+        IExplorerWindowMonitorService? explorerWindowMonitor = null)
     {
         _window = window;
         _webView = webView;
@@ -57,6 +59,7 @@ public class VueBridgeController
         _passwordService = passwordService;
         _pathValidator = pathValidator;
         _trayService = trayService;
+        _explorerWindowMonitor = explorerWindowMonitor;
     }
 
     public async Task HandleMessageAsync(string messageJson)
@@ -154,6 +157,7 @@ public class VueBridgeController
                 var lockResult = await _lockService.LockFolderAsync(folder.Id, password);
                 if (lockResult.Success)
                 {
+                    _explorerWindowMonitor?.UntrackFolder(folder.Id);
                     var updated = await _db.GetFolderByIdAsync(folder.Id);
                     if (updated != null)
                     {
@@ -204,6 +208,7 @@ public class VueBridgeController
                     }
                 }
 
+                _explorerWindowMonitor?.UntrackFolder(folderId);
                 _ransomwareService.StopMonitoringFolder(folderId);
 
                 // Remove from SecApper tracking database. Actual files are NEVER deleted.
@@ -252,6 +257,7 @@ public class VueBridgeController
                         FileName = folder.FolderPath,
                         UseShellExecute = true
                     });
+                    _explorerWindowMonitor?.TrackFolderWindow(folder.Id, folder.FolderPath);
                     return true;
                 }
                 return false;
@@ -508,22 +514,182 @@ public class VueBridgeController
             case "settings.get":
             {
                 bool hasPin = await _masterPinService.IsMasterPinConfiguredAsync();
+                string autoCheck = await _db.GetSettingAsync("AutoCheckUpdates", "true") ?? "true";
+                string freq = await _db.GetSettingAsync("UpdateCheckFrequency", "Daily") ?? "Daily";
+                string ransomware = await _db.GetSettingAsync("RansomwareProtectionEnabled", "true") ?? "true";
+                string thresholdStr = await _db.GetSettingAsync("MassModificationThreshold", "30") ?? "30";
+                string explorer = await _db.GetSettingAsync("ExplorerIntegrationEnabled", "true") ?? "true";
+                string darkModeStr = await _db.GetSettingAsync("DarkMode", "false") ?? "false";
+                string startWin = await _db.GetSettingAsync("StartWithWindows", "true") ?? "true";
+                string minTray = await _db.GetSettingAsync("MinimizeToTray", "true") ?? "true";
+
+                int.TryParse(thresholdStr, out int threshold);
+                if (threshold <= 0) threshold = 30;
+
                 return new
                 {
-                    autoCheckUpdates = true,
-                    updateFrequency = "Daily",
-                    ransomwareProtectionEnabled = true,
-                    massModificationThreshold = 30,
-                    explorerIntegrationEnabled = true,
+                    autoCheckUpdates = autoCheck == "true",
+                    updateFrequency = freq,
+                    ransomwareProtectionEnabled = ransomware == "true",
+                    massModificationThreshold = threshold,
+                    explorerIntegrationEnabled = explorer == "true",
                     masterPinConfigured = hasPin,
-                    darkMode = false,
-                    startWithWindows = true,
-                    minimizeToTray = true
+                    darkMode = darkModeStr == "true",
+                    startWithWindows = startWin == "true",
+                    minimizeToTray = minTray == "true"
                 };
             }
 
             case "settings.update":
             {
+                if (payload.TryGetProperty("autoCheckUpdates", out var acu))
+                    await _db.SetSettingAsync("AutoCheckUpdates", acu.GetBoolean() ? "true" : "false");
+                if (payload.TryGetProperty("updateFrequency", out var uf))
+                    await _db.SetSettingAsync("UpdateCheckFrequency", uf.GetString() ?? "Daily");
+                if (payload.TryGetProperty("ransomwareProtectionEnabled", out var rpe))
+                    await _db.SetSettingAsync("RansomwareProtectionEnabled", rpe.GetBoolean() ? "true" : "false");
+                if (payload.TryGetProperty("massModificationThreshold", out var mmt))
+                    await _db.SetSettingAsync("MassModificationThreshold", mmt.GetInt32().ToString());
+                if (payload.TryGetProperty("explorerIntegrationEnabled", out var eie))
+                    await _db.SetSettingAsync("ExplorerIntegrationEnabled", eie.GetBoolean() ? "true" : "false");
+                if (payload.TryGetProperty("darkMode", out var dm))
+                    await _db.SetSettingAsync("DarkMode", dm.GetBoolean() ? "true" : "false");
+                if (payload.TryGetProperty("startWithWindows", out var sww))
+                    await _db.SetSettingAsync("StartWithWindows", sww.GetBoolean() ? "true" : "false");
+                if (payload.TryGetProperty("minimizeToTray", out var mtt))
+                    await _db.SetSettingAsync("MinimizeToTray", mtt.GetBoolean() ? "true" : "false");
+
+                return new { success = true };
+            }
+
+            // --- Dynamic Setup & User Profile ---
+            case "setup.isCompleted":
+            {
+                string? completed = await _db.GetSettingAsync("SetupCompleted", "false");
+                return string.Equals(completed, "true", StringComparison.OrdinalIgnoreCase);
+            }
+
+            case "setup.getInitialData":
+            {
+                string systemUser = Environment.UserName;
+                if (string.IsNullOrWhiteSpace(systemUser)) systemUser = "Security User";
+
+                string machine = Environment.MachineName;
+                string os = Environment.OSVersion.VersionString;
+
+                string? installId = await _db.GetSettingAsync("UserProfile_InstallationId");
+                if (string.IsNullOrWhiteSpace(installId))
+                {
+                    installId = $"SEC-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}-{Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}";
+                    await _db.SetSettingAsync("UserProfile_InstallationId", installId);
+                }
+
+                bool hasPin = await _masterPinService.IsMasterPinConfiguredAsync();
+
+                return new
+                {
+                    suggestedUsername = systemUser,
+                    machineName = machine,
+                    osVersion = os,
+                    installationId = installId,
+                    hasMasterPin = hasPin
+                };
+            }
+
+            case "setup.complete":
+            {
+                string userName = payload.TryGetProperty("userName", out var unProp) ? unProp.GetString() ?? Environment.UserName : Environment.UserName;
+                string userRole = payload.TryGetProperty("userRole", out var urProp) ? urProp.GetString() ?? "Security Administrator" : "Security Administrator";
+                string avatar = payload.TryGetProperty("avatar", out var avProp) ? avProp.GetString() ?? "shield-cyan" : "shield-cyan";
+                string securityTier = payload.TryGetProperty("securityTier", out var stProp) ? stProp.GetString() ?? "Standard" : "Standard";
+                string recoveryCode = payload.TryGetProperty("recoveryCode", out var rcProp) ? rcProp.GetString() ?? string.Empty : string.Empty;
+                bool darkMode = payload.TryGetProperty("darkMode", out var dmProp) && dmProp.GetBoolean();
+                int threshold = payload.TryGetProperty("ransomwareThreshold", out var thProp) ? thProp.GetInt32() : 30;
+
+                await _db.SetSettingAsync("SetupCompleted", "true");
+                await _db.SetSettingAsync("UserProfile_Name", userName);
+                await _db.SetSettingAsync("UserProfile_Role", userRole);
+                await _db.SetSettingAsync("UserProfile_Avatar", avatar);
+                await _db.SetSettingAsync("UserProfile_SecurityTier", securityTier);
+                await _db.SetSettingAsync("UserProfile_RecoveryCode", recoveryCode);
+                await _db.SetSettingAsync("UserProfile_SetupDate", DateTime.UtcNow.ToString("o"));
+                await _db.SetSettingAsync("DarkMode", darkMode ? "true" : "false");
+                await _db.SetSettingAsync("MassModificationThreshold", threshold.ToString());
+
+                if (payload.TryGetProperty("masterPin", out var pinProp))
+                {
+                    string? pin = pinProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(pin))
+                    {
+                        await _masterPinService.SetMasterPinAsync(pin.Trim());
+                    }
+                }
+
+                if (securityTier == "Maximum")
+                {
+                    await _db.SetSettingAsync("MassModificationThreshold", "15");
+                    await _db.SetSettingAsync("AutoLockOnWindowClose", "true");
+                }
+                else if (securityTier == "Relaxed")
+                {
+                    await _db.SetSettingAsync("MassModificationThreshold", "50");
+                }
+
+                await _db.AddSecurityEventAsync(new SecurityEvent
+                {
+                    EventType = "DynamicSetupCompleted",
+                    Severity = EventSeverity.Info,
+                    Description = $"Dynamic installation initialized for user '{userName}' ({userRole}) with '{securityTier}' security posture.",
+                    ActionTaken = "Profile Configured"
+                });
+
+                return new { success = true };
+            }
+
+            case "setup.reset":
+            {
+                await _db.SetSettingAsync("SetupCompleted", "false");
+                return true;
+            }
+
+            case "profile.get":
+            {
+                string? completed = await _db.GetSettingAsync("SetupCompleted", "false");
+                string userName = await _db.GetSettingAsync("UserProfile_Name") ?? Environment.UserName;
+                string userRole = await _db.GetSettingAsync("UserProfile_Role") ?? "Security Administrator";
+                string avatar = await _db.GetSettingAsync("UserProfile_Avatar") ?? "shield-cyan";
+                string securityTier = await _db.GetSettingAsync("UserProfile_SecurityTier") ?? "Standard";
+                string? installId = await _db.GetSettingAsync("UserProfile_InstallationId");
+                if (string.IsNullOrWhiteSpace(installId))
+                {
+                    installId = $"SEC-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}-{Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}";
+                    await _db.SetSettingAsync("UserProfile_InstallationId", installId);
+                }
+                string? setupDate = await _db.GetSettingAsync("UserProfile_SetupDate");
+
+                return new
+                {
+                    userName,
+                    userRole,
+                    avatar,
+                    securityTier,
+                    installationId = installId,
+                    setupDate,
+                    isCompleted = string.Equals(completed, "true", StringComparison.OrdinalIgnoreCase)
+                };
+            }
+
+            case "profile.update":
+            {
+                if (payload.TryGetProperty("userName", out var un))
+                    await _db.SetSettingAsync("UserProfile_Name", un.GetString() ?? Environment.UserName);
+                if (payload.TryGetProperty("userRole", out var ur))
+                    await _db.SetSettingAsync("UserProfile_Role", ur.GetString() ?? "Security Administrator");
+                if (payload.TryGetProperty("avatar", out var av))
+                    await _db.SetSettingAsync("UserProfile_Avatar", av.GetString() ?? "shield-cyan");
+                if (payload.TryGetProperty("securityTier", out var st))
+                    await _db.SetSettingAsync("UserProfile_SecurityTier", st.GetString() ?? "Standard");
+
                 return new { success = true };
             }
 

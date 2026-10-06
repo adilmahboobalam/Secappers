@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SecApper.Security\SecApper.Security.csproj" />
+    <ProjectReference Include="..\SecApper.FolderLocker\SecApper.FolderLocker.csproj" />
   </ItemGroup>
 
 </Project>

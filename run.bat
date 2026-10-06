@@ -5,8 +5,18 @@ if exist "%~dp0publish\SecApper.FolderLocker.exe" (
     start "" "SecApper.FolderLocker.exe"
     exit /b 0
 )
+if exist "%~dp0src\SecApper.FolderLocker\bin\Release\net8.0-windows\win-x64\SecApper.FolderLocker.exe" (
+    cd /d "%~dp0src\SecApper.FolderLocker\bin\Release\net8.0-windows\win-x64"
+    start "" "SecApper.FolderLocker.exe"
+    exit /b 0
+)
 if exist "%~dp0src\SecApper.FolderLocker\bin\Release\net8.0-windows\SecApper.FolderLocker.exe" (
     cd /d "%~dp0src\SecApper.FolderLocker\bin\Release\net8.0-windows"
+    start "" "SecApper.FolderLocker.exe"
+    exit /b 0
+)
+if exist "%~dp0src\SecApper.FolderLocker\bin\Debug\net8.0-windows\win-x64\SecApper.FolderLocker.exe" (
+    cd /d "%~dp0src\SecApper.FolderLocker\bin\Debug\net8.0-windows\win-x64"
     start "" "SecApper.FolderLocker.exe"
     exit /b 0
 )

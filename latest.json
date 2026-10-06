@@ -1,9 +1,9 @@
 {
   "version": "1.1.1",
-  "releaseDate": "2026-10-04",
+  "releaseDate": "2026-10-05",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "cdbb5d1889f9a5ff7a87c7f3f570e37c9519c6d5ffcedd31ba94aabe78f21b01",
+  "sha256": "c1b4a67c74757f6ec3409450cd0be5a20efaba7df09d185ca91bc7938b9dd0ae",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "releaseNotes": "SecApper v1.1.1 Live Update:\n• Fixed Master Security PIN configured on installation for universal folder unlock\n• Active double-click Windows Explorer unlock popup\n• Native NTFS Discretionary Access Control enforcement\n• Operation journal crash recovery\n• Background ransomware threat protection\n• Standalone zero-downtime auto-updater\n• Commercial cybersecurity GUI with official branding"
+  "releaseNotes": "SecApper Live Update:\n• Dynamic first-run onboarding setup wizard and personalized user security profiles\n• Intercept Windows Explorer permission denial (TaskDialog & DirectUI) with centered Unlock dialog\n• Automatic re-lock when Windows Explorer folder window closes\n• Real-time Explorer window and tab tracking\n• Native NTFS Discretionary Access Control enforcement"
 }

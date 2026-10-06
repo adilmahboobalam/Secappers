@@ -122,6 +122,7 @@ public partial class MainWindow : Window
                 await PromptUnlockPopupAsync(folder);
             });
         };
+        _accessMonitor.Start();
 
         _trayService.OpenRequested += RestoreWindow;
         _trayService.ExitRequested += () =>

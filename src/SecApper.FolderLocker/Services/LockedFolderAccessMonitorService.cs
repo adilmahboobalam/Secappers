@@ -56,22 +56,30 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         _cts = null;
     }
 
+    private DateTime _lastDbFetch = DateTime.MinValue;
+    private List<FolderRecord> _cachedLockedFolders = new();
+
     private async Task MonitorLoopAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                // High responsiveness polling for seamless double-click interception
-                await Task.Delay(100, ct);
+                // High responsiveness polling (80ms) for instant double-click interception
+                await Task.Delay(80, ct);
 
-                // Fetch currently locked folder paths
-                var allFolders = await _db.GetAllFoldersAsync();
-                var lockedFolders = allFolders.Where(f => f.Status == FolderStatus.Locked).ToList();
-                if (lockedFolders.Count == 0) continue;
+                // Fetch locked folders at most once per second to prevent SQLite contention
+                if ((DateTime.UtcNow - _lastDbFetch).TotalMilliseconds > 1000 || _cachedLockedFolders.Count == 0)
+                {
+                    var allFolders = await _db.GetAllFoldersAsync();
+                    _cachedLockedFolders = allFolders.Where(f => f.Status == FolderStatus.Locked).ToList();
+                    _lastDbFetch = DateTime.UtcNow;
+                }
+
+                if (_cachedLockedFolders.Count == 0) continue;
 
                 // Look for Windows Explorer permission denial / TaskDialog prompts
-                ScanWindowsForAccessDenied(lockedFolders);
+                ScanWindowsForAccessDenied(_cachedLockedFolders);
             }
             catch (OperationCanceledException)
             {
@@ -103,28 +111,45 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 return true;
             }
 
-            // Verify window belongs to Windows Explorer
             GetWindowThreadProcessId(hWnd, out uint pid);
             if (pid == 0) return true;
 
             bool isExplorer = false;
-            try
+            IntPtr hProcess = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, pid);
+            if (hProcess != IntPtr.Zero)
             {
-                using var proc = Process.GetProcessById((int)pid);
-                isExplorer = proc.ProcessName.Contains("explorer", StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-                // Process may have exited or is inaccessible
+                try
+                {
+                    var sbExe = new StringBuilder(1024);
+                    int size = sbExe.Capacity;
+                    if (QueryFullProcessImageName(hProcess, 0, sbExe, ref size))
+                    {
+                        isExplorer = sbExe.ToString().IndexOf("explorer", StringComparison.OrdinalIgnoreCase) >= 0;
+                    }
+                }
+                finally
+                {
+                    CloseHandle(hProcess);
+                }
             }
 
-            if (!isExplorer) return true;
+            if (!isExplorer)
+            {
+                try
+                {
+                    using var proc = Process.GetProcessById((int)pid);
+                    isExplorer = proc.ProcessName.Contains("explorer", StringComparison.OrdinalIgnoreCase);
+                }
+                catch
+                {
+                }
+            }
 
             var sbTitle = new StringBuilder(512);
             GetWindowText(hWnd, sbTitle, sbTitle.Capacity);
             string title = sbTitle.ToString().Trim();
 
-            // Extract dialog structure & text from all child controls
+            // Extract dialog structure & text from all child controls fast via Win32
             bool hasDirectUi = false;
             bool hasContinueOrCancel = false;
             var childTextSb = new StringBuilder();
@@ -162,42 +187,6 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 return true;
             }, IntPtr.Zero);
 
-            // Attempt UI Automation inspection to read DirectUI DirectWrite elements
-            try
-            {
-                var autoElement = System.Windows.Automation.AutomationElement.FromHandle(hWnd);
-                if (autoElement != null)
-                {
-                    try
-                    {
-                        string rootName = autoElement.Current.Name;
-                        if (!string.IsNullOrWhiteSpace(rootName)) childTextSb.Append(rootName).Append(' ');
-                    }
-                    catch { }
-
-                    var autoChildren = autoElement.FindAll(
-                        System.Windows.Automation.TreeScope.Descendants,
-                        System.Windows.Automation.Condition.TrueCondition);
-
-                    foreach (System.Windows.Automation.AutomationElement child in autoChildren)
-                    {
-                        try
-                        {
-                            string n = child.Current.Name;
-                            if (!string.IsNullOrWhiteSpace(n))
-                            {
-                                childTextSb.Append(n).Append(' ');
-                            }
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch
-            {
-                // UI Automation unavailable or failed, fallback to class/title/buttons
-            }
-
             string allText = title + " " + childTextSb.ToString();
 
             bool isPermissionOrDeniedDialog =
@@ -219,7 +208,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                     folderName = Path.GetFileName(fullPath);
                 }
 
-                // Check entire dialog content (title + instruction + content labels)
+                // Match by path or folder name
                 bool allTextContainsPath = allText.Contains(fullPath, StringComparison.OrdinalIgnoreCase);
                 bool allTextContainsName = !string.IsNullOrEmpty(folderName) &&
                                            allText.Contains(folderName, StringComparison.OrdinalIgnoreCase);
@@ -235,11 +224,11 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 {
                     matches = true;
                 }
-                else if (allTextContainsName && isPermissionOrDeniedDialog)
+                else if (allTextContainsName && (isPermissionOrDeniedDialog || isExplorer))
                 {
                     matches = true;
                 }
-                else if (titleMatchesExactName && (isPermissionOrDeniedDialog || hasDirectUi))
+                else if (titleMatchesExactName && (isPermissionOrDeniedDialog || hasDirectUi || isExplorer))
                 {
                     matches = true;
                 }
@@ -247,7 +236,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 {
                     matches = true;
                 }
-                else if (titleContainsName && isPermissionOrDeniedDialog)
+                else if (titleContainsName && (isPermissionOrDeniedDialog || hasDirectUi || isExplorer))
                 {
                     matches = true;
                 }
@@ -288,25 +277,22 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
             // 1. Immediately hide window from user's display
             ShowWindow(hWnd, SW_HIDE);
 
-            // 2. Click OK or Cancel child button if present
+            // 2. Click Cancel child button to abort Windows Explorer elevation
             EnumChildWindows(hWnd, (childHwnd, _) =>
             {
                 var sbText = new StringBuilder(64);
                 GetWindowText(childHwnd, sbText, sbText.Capacity);
                 string bText = sbText.ToString().Trim();
-                if (bText.Contains("OK", StringComparison.OrdinalIgnoreCase) ||
-                    bText.Contains("Cancel", StringComparison.OrdinalIgnoreCase))
+                if (bText.Equals("Cancel", StringComparison.OrdinalIgnoreCase) ||
+                    bText.Equals("OK", StringComparison.OrdinalIgnoreCase))
                 {
                     PostMessage(childHwnd, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
                 }
                 return true;
             }, IntPtr.Zero);
 
-            // 3. Send IDOK (1) or IDCANCEL (2) commands
-            PostMessage(hWnd, WM_COMMAND, (IntPtr)1 /*IDOK*/, IntPtr.Zero);
+            // 3. Send IDCANCEL (2) and WM_CLOSE
             PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /*IDCANCEL*/, IntPtr.Zero);
-
-            // 4. Send WM_CLOSE
             PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
         }
         catch
@@ -354,4 +340,13 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
 
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern bool QueryFullProcessImageName(IntPtr hProcess, int flags, StringBuilder text, ref int size);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr hObject);
 }

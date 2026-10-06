@@ -50,6 +50,8 @@ export const useUpdateStore = defineStore('updates', () => {
     } catch (err: any) {
       error.value = err.message || 'Failed to download update';
       updateInfo.value.status = 'Error';
+      updateInfo.value.statusMessage = err.message || 'Failed to download update';
+      throw err;
     } finally {
       isDownloading.value = false;
     }
@@ -57,6 +59,7 @@ export const useUpdateStore = defineStore('updates', () => {
 
   async function installUpdate() {
     isInstalling.value = true;
+    error.value = null;
     updateInfo.value.status = 'Installing';
     updateInfo.value.statusMessage = 'Applying update and restarting SecApper...';
     try {
@@ -64,6 +67,8 @@ export const useUpdateStore = defineStore('updates', () => {
     } catch (err: any) {
       error.value = err.message || 'Failed to install update';
       updateInfo.value.status = 'Error';
+      updateInfo.value.statusMessage = err.message || 'Failed to install update';
+      throw err;
     } finally {
       isInstalling.value = false;
     }

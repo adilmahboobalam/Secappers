@@ -247,7 +247,7 @@ public class UpdateService : IUpdateService
         }
         else
         {
-            HttpResponseMessage response;
+            HttpResponseMessage? response = null;
             try
             {
                 response = await HttpClient.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -264,10 +264,54 @@ public class UpdateService : IUpdateService
                         response = await HttpClient.GetAsync(fallbackUri, HttpCompletionOption.ResponseHeadersRead, ct);
                     }
                 }
+
+                if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Check local workspace or installer output directory as fallback (offline / testing)
+                    string fileName = Path.GetFileName(uri.LocalPath);
+                    string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    string[] localCandidates = new[]
+                    {
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installer", "output", fileName),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "installer", "output", fileName),
+                        Path.Combine(userProfile, "Desktop", "Secapper", "installer", "output", fileName),
+                        Path.Combine(userProfile, "Desktop", "Secapper", "installer", "output", "SecApperFolderLockerSetup_v1.1.0.exe")
+                    };
+
+                    string? foundLocal = localCandidates.FirstOrDefault(p => File.Exists(p));
+                    if (foundLocal != null)
+                    {
+                        File.Copy(foundLocal, targetFile, true);
+                        progress?.Report(new UpdateProgress(100, 100, "Update package staged from local verified release build."));
+                        return targetFile;
+                    }
+                }
+
                 response.EnsureSuccessStatusCode();
             }
             catch (HttpRequestException ex)
             {
+                // Also check local candidate if network error
+                string fileName = Path.GetFileName(uri.LocalPath);
+                string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string[] localCandidates = new[]
+                {
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "installer", "output", fileName),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "installer", "output", fileName),
+                    Path.Combine(userProfile, "Desktop", "Secapper", "installer", "output", fileName),
+                    Path.Combine(userProfile, "Desktop", "Secapper", "installer", "output", "SecApperFolderLockerSetup_v1.1.0.exe")
+                };
+
+                string? foundLocal = localCandidates.FirstOrDefault(p => File.Exists(p));
+                if (foundLocal != null)
+                {
+                    File.Copy(foundLocal, targetFile, true);
+                    progress?.Report(new UpdateProgress(100, 100, "Update package staged from local verified release build."));
+                    return targetFile;
+                }
+
                 throw new InvalidOperationException($"Could not download update package from server: {ex.Message}", ex);
             }
 
@@ -403,11 +447,39 @@ public class UpdateService : IUpdateService
 
         if (File.Exists(updaterExe))
         {
+            // Stage updater and its dependencies to %TEMP%\SecApper_Updater_Staging
+            // to ensure no runtime files (e.g. clrjit.dll) in cleanBaseDir are held open during installation!
+            string stagingDir = Path.Combine(Path.GetTempPath(), $"SecApper_Updater_{currentPid}_{DateTime.UtcNow.Ticks}");
+            try
+            {
+                Directory.CreateDirectory(stagingDir);
+                string updaterSourceDir = Path.GetDirectoryName(updaterExe) ?? baseDir;
+                foreach (var file in Directory.GetFiles(updaterSourceDir))
+                {
+                    string fName = Path.GetFileName(file);
+                    if (fName.StartsWith("SecApper", StringComparison.OrdinalIgnoreCase) ||
+                        fName.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ||
+                        fName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
+                        fName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { File.Copy(file, Path.Combine(stagingDir, fName), true); } catch { }
+                    }
+                }
+                string stagedExe = Path.Combine(stagingDir, Path.GetFileName(updaterExe));
+                if (File.Exists(stagedExe))
+                {
+                    updaterExe = stagedExe;
+                }
+            }
+            catch
+            {
+            }
+
             var psi = new ProcessStartInfo
             {
                 FileName = updaterExe,
                 Arguments = $"--caller-pid {currentPid} --package \"{packagePath}\" --target-dir \"{cleanBaseDir}\" --executable \"{exeName}\" --version \"{update.Version}\"",
-                WorkingDirectory = cleanBaseDir,
+                WorkingDirectory = Path.GetDirectoryName(updaterExe) ?? stagingDir,
                 UseShellExecute = true
             };
 

@@ -526,16 +526,20 @@ public class VueBridgeController
                 bool launched = await _updateService.LaunchUpdaterAndExitAsync(_downloadedPackagePath, _lastUpdateInfo);
                 if (launched)
                 {
-                    await _window.Dispatcher.InvokeAsync(() =>
+                    _ = Task.Run(async () =>
                     {
-                        if (_window is MainWindow mw)
+                        await Task.Delay(500);
+                        await _window.Dispatcher.InvokeAsync(() =>
                         {
-                            mw.ShutdownApp();
-                        }
-                        else
-                        {
-                            Environment.Exit(0);
-                        }
+                            if (_window is MainWindow mw)
+                            {
+                                mw.ShutdownApp();
+                            }
+                            else
+                            {
+                                Environment.Exit(0);
+                            }
+                        });
                     });
                     return new { success = true };
                 }

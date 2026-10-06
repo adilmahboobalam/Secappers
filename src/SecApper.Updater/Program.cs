@@ -143,7 +143,7 @@ public static class Program
             waitAttempts++;
         }
 
-        // F. Verify target executable is unlocked and writable
+        // F. Verify target executable and runtime DLLs are unlocked and writable
         string testExe = Path.Combine(cleanTargetDir, exeName);
         if (File.Exists(testExe))
         {
@@ -160,6 +160,27 @@ public static class Program
                 {
                     lockCheck++;
                     Log($"Waiting for file lock on {testExe} to release ({lockCheck}/10)...");
+                    Thread.Sleep(500);
+                }
+            }
+        }
+
+        string testClrJit = Path.Combine(cleanTargetDir, "clrjit.dll");
+        if (File.Exists(testClrJit))
+        {
+            int lockCheck = 0;
+            while (lockCheck < 10)
+            {
+                try
+                {
+                    using var fs = File.Open(testClrJit, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                    Log("Runtime clrjit.dll verified unlocked and writable.");
+                    break;
+                }
+                catch
+                {
+                    lockCheck++;
+                    Log($"Waiting for file lock on {testClrJit} to release ({lockCheck}/10)...");
                     Thread.Sleep(500);
                 }
             }
@@ -274,6 +295,15 @@ public static class Program
         else
         {
             Log($"Update applied successfully to version {version ?? "latest"}.");
+            try
+            {
+                if (backupCreated && Directory.Exists(backupDir))
+                {
+                    Directory.Delete(backupDir, true);
+                    Log("Temporary update backup cleaned up.");
+                }
+            }
+            catch { }
         }
 
         // Step 5: Launch the updated application

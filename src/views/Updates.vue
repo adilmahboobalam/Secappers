@@ -22,8 +22,14 @@ async function handleCheck() {
 }
 
 async function handleUpdate() {
-  await updateStore.downloadUpdate();
-  await updateStore.installUpdate();
+  try {
+    await updateStore.downloadUpdate();
+    if (updateStore.updateInfo.status === 'Ready') {
+      await updateStore.installUpdate();
+    }
+  } catch (err: any) {
+    toast.error('Update Failed', err.message || 'Could not complete update process.');
+  }
 }
 </script>
 

@@ -53,7 +53,7 @@ Root: HKCU; Subkey: "Software\Classes\Directory\shell\SecApperFolderLocker"; Val
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\SecApperFolderLocker\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Tasks: explorermenu
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall
 
 [Code]
 // Pre-installation cleanup: safely terminate existing instances to avoid file locks
@@ -62,7 +62,6 @@ var
   ResultCode: Integer;
 begin
   Exec('taskkill.exe', '/F /IM SecApper.FolderLocker.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('taskkill.exe', '/F /IM SecApper.Updater.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Sleep(500);
   Result := '';
 end;

@@ -175,11 +175,19 @@ class NativeBridgeService implements SecapperBridge {
     },
 
     download: async (): Promise<boolean> => {
-      return this.sendNative<boolean>('updates.download');
+      const res = await this.sendNative<any>('updates.download');
+      if (res && res.success === false) {
+        throw new Error(res.error || 'Failed to download update.');
+      }
+      return true;
     },
 
     install: async (): Promise<boolean> => {
-      return this.sendNative<boolean>('updates.install');
+      const res = await this.sendNative<any>('updates.install');
+      if (res && res.success === false) {
+        throw new Error(res.error || 'Failed to launch update installer.');
+      }
+      return true;
     },
   };
 

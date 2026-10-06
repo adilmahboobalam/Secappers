@@ -4,7 +4,7 @@ import type { FolderRecord } from '../../types';
 import { useFolderStore } from '../../stores/folders';
 import { useToast } from '../../composables/useToast';
 import Button from '../common/Button.vue';
-import shieldUrl from '../../assets/branding/secapper-shield.png';
+import logoUrl from '../../assets/branding/secapper-logo.png';
 import { Unlock, Eye, EyeOff, AlertCircle } from 'lucide-vue-next';
 
 interface Props {
@@ -63,13 +63,15 @@ async function handleUnlock() {
       class="bg-white dark:bg-[#0F1E30] border border-[#E4E7EC] dark:border-[#1E293B] rounded-xl shadow-modal max-w-sm w-full overflow-hidden text-center animate-scale-in"
       @click.stop
     >
-      <!-- Premium Centered Brand Shield -->
-      <div class="pt-8 pb-4 px-6">
-        <div class="w-16 h-16 mx-auto mb-4 p-2 rounded-2xl bg-[#122D55] border border-[#1E427B] flex items-center justify-center shadow-shield">
-          <img :src="shieldUrl" alt="SecApper Shield" class="w-full h-full object-contain filter drop-shadow" />
+      <!-- Premium Brand Header with Official Logo -->
+      <div class="pt-7 pb-3 px-6">
+        <div class="flex items-center justify-center mb-4">
+          <div class="px-4 py-2.5 rounded-xl bg-[#08182E] dark:bg-[#06152A] border border-[#14325C]/80 shadow-inner flex items-center justify-center">
+            <img :src="logoUrl" alt="SecApper — Secure Your World" class="h-7 w-auto max-w-[210px] object-contain drop-shadow-sm" />
+          </div>
         </div>
 
-        <h3 class="text-lg font-bold text-[#101828] dark:text-[#F8FAFC]">
+        <h3 class="text-base font-bold text-[#101828] dark:text-[#F8FAFC]">
           Unlock Protected Folder
         </h3>
         <p class="text-sm font-semibold text-[#122D55] dark:text-[#93C5FD] mt-1 truncate">

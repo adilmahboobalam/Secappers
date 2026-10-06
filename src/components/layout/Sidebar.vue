@@ -106,18 +106,15 @@ function isActive(path: string) {
     class="w-[250px] shrink-0 h-full flex flex-col justify-between bg-[#091D38] border-r border-[#102747] text-white select-none relative z-20"
   >
     <!-- Brand Header -->
-    <div class="pt-5 px-5 pb-4 border-b border-[#122D55]/60 bg-[#06152A]/40">
+    <div class="py-4 px-4 border-b border-[#122D55]/60 bg-[#06152A]/40">
       <div class="flex items-center justify-center">
-        <!-- Official Logo supplied by brand - DO NOT stretch, recolor, or distort -->
+        <!-- Official Logo supplied by brand -->
         <img
           :src="logoUrl"
           alt="SecApper — Secure Your World"
-          class="h-10 w-auto object-contain cursor-pointer transition-opacity hover:opacity-95"
+          class="h-9 max-w-full w-auto object-contain cursor-pointer transition-opacity hover:opacity-95"
           @click="navigate('/dashboard')"
         />
-      </div>
-      <div class="text-[10px] tracking-[0.2em] font-semibold text-center text-[#94A3B8] uppercase mt-2">
-        Secure Your World
       </div>
     </div>
 

@@ -170,6 +170,15 @@ public class UnlockAndAutoLockTests : IDisposable
         Assert.Equal(FolderStatus.Locked, finalFolder.Status);
     }
 
+    [Fact]
+    public void LockedFolderAccessMonitorService_StartAndStop_OperatesCleanly()
+    {
+        using var monitor = new LockedFolderAccessMonitorService(_db, action => action());
+        monitor.Start();
+        Thread.Sleep(150);
+        monitor.Stop();
+    }
+
     public void Dispose()
     {
         try

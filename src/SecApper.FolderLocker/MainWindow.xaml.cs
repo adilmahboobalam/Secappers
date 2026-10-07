@@ -121,20 +121,17 @@ public partial class MainWindow : Window
         };
 
         // 3. Active Explorer Double-Click Interceptor
-        _accessMonitor = new LockedFolderAccessMonitorService(_db, action => Dispatcher.Invoke(action));
+        _accessMonitor = new LockedFolderAccessMonitorService(_db, action => Dispatcher.BeginInvoke(action));
         _accessMonitor.FolderUnlockRequested += async folder =>
         {
-            await Dispatcher.InvokeAsync(async () =>
+            try
             {
-                try
-                {
-                    await PromptUnlockPopupAsync(folder);
-                }
-                catch (Exception ex)
-                {
-                    App.LogError("FolderUnlockRequested", ex);
-                }
-            });
+                await PromptUnlockPopupAsync(folder);
+            }
+            catch (Exception ex)
+            {
+                App.LogError("FolderUnlockRequested", ex);
+            }
         };
         _accessMonitor.Start();
 
@@ -213,6 +210,11 @@ public partial class MainWindow : Window
     {
         if (_activeUnlockDialog != null && _activeUnlockFolderId == folder.Id)
         {
+            var helper = new System.Windows.Interop.WindowInteropHelper(_activeUnlockDialog);
+            if (helper.Handle != IntPtr.Zero)
+            {
+                Views.UnlockDialog.ForceForeground(helper.Handle);
+            }
             _activeUnlockDialog.Activate();
             return;
         }

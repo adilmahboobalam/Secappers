@@ -14,6 +14,47 @@ public partial class UnlockDialog : Window
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr ProcessId);
+
+    [DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll")]
+    private static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    public static void ForceForeground(IntPtr hWnd)
+    {
+        try
+        {
+            IntPtr foregroundWnd = GetForegroundWindow();
+            uint foregroundThreadId = GetWindowThreadProcessId(foregroundWnd, IntPtr.Zero);
+            uint currentThreadId = GetCurrentThreadId();
+
+            if (foregroundThreadId != 0 && foregroundThreadId != currentThreadId)
+            {
+                AttachThreadInput(currentThreadId, foregroundThreadId, true);
+                SetForegroundWindow(hWnd);
+                BringWindowToTop(hWnd);
+                AttachThreadInput(currentThreadId, foregroundThreadId, false);
+            }
+            else
+            {
+                SetForegroundWindow(hWnd);
+                BringWindowToTop(hWnd);
+            }
+        }
+        catch
+        {
+        }
+    }
+
     public Func<string, Task<string?>>? ValidatePasswordAsync { get; set; }
     private bool _isPasswordVisible;
 
@@ -25,12 +66,29 @@ public partial class UnlockDialog : Window
             try
             {
                 Topmost = true;
-                Activate();
-                Focus();
                 var helper = new WindowInteropHelper(this);
                 if (helper.Handle != IntPtr.Zero)
                 {
-                    SetForegroundWindow(helper.Handle);
+                    ForceForeground(helper.Handle);
+                }
+                Activate();
+                Focus();
+            }
+            catch
+            {
+            }
+            PwdBox.Focus();
+            Keyboard.Focus(PwdBox);
+        };
+
+        ContentRendered += (s, e) =>
+        {
+            try
+            {
+                var helper = new WindowInteropHelper(this);
+                if (helper.Handle != IntPtr.Zero)
+                {
+                    ForceForeground(helper.Handle);
                 }
             }
             catch

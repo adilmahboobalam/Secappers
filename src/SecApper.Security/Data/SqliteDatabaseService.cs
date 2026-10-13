@@ -33,18 +33,34 @@ public class SqliteDatabaseService : IDatabaseService
     {
         try
         {
+            string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string userDir = Path.Combine(localApp, "SecApper", "FolderLocker");
+            Directory.CreateDirectory(userDir);
+            string userDbPath = Path.Combine(userDir, "locker.db");
+
+            // Migration fallback: If local user database does not exist or is empty, but CommonApplicationData has an existing database, migrate it
             string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            string secApperDir = Path.Combine(programData, "SecApper", "FolderLocker");
-            Directory.CreateDirectory(secApperDir);
+            string legacyDbPath = Path.Combine(programData, "SecApper", "FolderLocker", "locker.db");
 
-            // Attempt to ensure directory is accessible to current user & admins
-            TrySecureDirectory(secApperDir);
+            if ((!File.Exists(userDbPath) || new FileInfo(userDbPath).Length == 0) && File.Exists(legacyDbPath) && new FileInfo(legacyDbPath).Length > 0)
+            {
+                try
+                {
+                    File.Copy(legacyDbPath, userDbPath, true);
+                    string legacyShm = legacyDbPath + "-shm";
+                    string legacyWal = legacyDbPath + "-wal";
+                    if (File.Exists(legacyWal)) File.Copy(legacyWal, userDbPath + "-wal", true);
+                    if (File.Exists(legacyShm)) File.Copy(legacyShm, userDbPath + "-shm", true);
+                }
+                catch
+                {
+                }
+            }
 
-            return Path.Combine(secApperDir, "locker.db");
+            return userDbPath;
         }
         catch
         {
-            // Fallback to local app data if ProgramData is inaccessible without admin rights
             string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string fallbackDir = Path.Combine(localApp, "SecApper", "FolderLocker");
             Directory.CreateDirectory(fallbackDir);

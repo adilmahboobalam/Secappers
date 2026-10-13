@@ -3,7 +3,9 @@ bin/
 obj/
 publish/
 standalone/
-installer/output/
+installer/output/*
+!installer/output/SecApperFolderLockerSetup_v1.1.0.exe
+!installer/output/*.exe
 TestResults/
 
 ## Visual Studio / IDE

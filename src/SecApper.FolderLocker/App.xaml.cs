@@ -102,6 +102,30 @@ public partial class App : System.Windows.Application
         }
 
         base.OnStartup(e);
+
+        var mw = new MainWindow();
+        MainWindow = mw;
+
+        bool isBackground = e.Args.Any(a => a.Equals("--background", StringComparison.OrdinalIgnoreCase) ||
+                                            a.Equals("--tray", StringComparison.OrdinalIgnoreCase) ||
+                                            a.Equals("-b", StringComparison.OrdinalIgnoreCase));
+        bool isUnlock = e.Args.Any(a => a.Equals("--unlock", StringComparison.OrdinalIgnoreCase));
+
+        if (isUnlock)
+        {
+            // Do NOT show MainWindow! Only handle the unlock command popup directly!
+            _ = mw.HandleCommandLineArgsAsync(e.Args);
+        }
+        else if (isBackground)
+        {
+            // Keep MainWindow hidden in background system tray
+            mw.Hide();
+        }
+        else
+        {
+            mw.Show();
+            mw.Activate();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

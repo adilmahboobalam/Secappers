@@ -179,6 +179,54 @@ public class UnlockAndAutoLockTests : IDisposable
         monitor.Stop();
     }
 
+    [Fact]
+    public void LockedFolderAccessMonitorService_SuppressionAndEnabledToggles_OperateCorrectly()
+    {
+        using var monitor = new LockedFolderAccessMonitorService(_db, action => action());
+        Assert.True(monitor.IsEnabled);
+        Assert.False(monitor.IsPromptActive);
+
+        // Test suppression
+        monitor.SuppressFolder(_targetFolder, TimeSpan.FromSeconds(30));
+        
+        // Test prompt active state flag
+        monitor.IsPromptActive = true;
+        Assert.True(monitor.IsPromptActive);
+        monitor.IsPromptActive = false;
+        Assert.False(monitor.IsPromptActive);
+
+        // Test enabled toggle
+        monitor.IsEnabled = false;
+        Assert.False(monitor.IsEnabled);
+        monitor.IsEnabled = true;
+        Assert.True(monitor.IsEnabled);
+    }
+
+    [Fact]
+    public void ExplorerIntegrationService_ShellAndStartupRegistration_OperatesCleanly()
+    {
+        var service = new ExplorerIntegrationService();
+
+        // 1. Context Menu Registration
+        bool enabled = service.EnableContextMenu();
+        Assert.True(enabled);
+        Assert.True(service.IsContextMenuEnabled());
+
+        // 2. Start with Windows Registration
+        bool startSet = service.SetStartWithWindows(true);
+        Assert.True(startSet);
+        Assert.True(service.IsStartWithWindowsEnabled());
+
+        bool startRemoved = service.SetStartWithWindows(false);
+        Assert.True(startRemoved);
+        Assert.False(service.IsStartWithWindowsEnabled());
+
+        // 3. Clean Context Menu
+        bool disabled = service.DisableContextMenu();
+        Assert.True(disabled);
+        Assert.False(service.IsContextMenuEnabled());
+    }
+
     public void Dispose()
     {
         try

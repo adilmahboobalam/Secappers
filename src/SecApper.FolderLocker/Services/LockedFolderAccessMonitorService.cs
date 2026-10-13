@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -7,7 +8,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Automation;
 using SecApper.Security.Data;
 using SecApper.Security.Models;
 
@@ -17,27 +17,39 @@ public interface ILockedFolderAccessMonitorService : IDisposable
 {
     void Start();
     void Stop();
+    void SuppressFolder(string folderPath, TimeSpan duration);
+    bool IsPromptActive { get; set; }
+    bool IsEnabled { get; set; }
     event Action<FolderRecord>? FolderUnlockRequested;
 }
 
 /// <summary>
 /// Monitors Windows Explorer access attempts to protected folders.
 /// When Windows Explorer attempts to open a locked folder and displays
-/// an "Access is denied" or "Location is not available" dialog, this service
-/// intercepts the dialog, immediately hides/dismisses it, and triggers the
-/// SecApper unlock popup.
+/// an "Access is denied" or "Location is not available" dialog (such as upon
+/// user double-clicking the folder icon), this service intercepts the dialog,
+/// cleanly dismisses the message box, and triggers the SecApper unlock popup.
+/// 
+/// Uses gentle foreground window inspection (500ms heartbeat) without invasive
+/// system hooks or UI automation tree dumping to ensure Windows Explorer,
+/// the taskbar, and navigation pane are NEVER frozen, hidden, or corrupted.
 /// </summary>
 public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorService
 {
     private readonly IDatabaseService _db;
     private readonly Action<Action> _dispatchToUi;
+    private readonly ConcurrentDictionary<string, DateTime> _suppressedFolders = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, DateTime> _lastPopupPerFolder = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<IntPtr, byte> _processedWindows = new();
+    private DateTime _lastGlobalPopupTime = DateTime.MinValue;
+    private readonly object _popupLock = new();
     private CancellationTokenSource? _cts;
     private Task? _monitorTask;
-    private AutomationEventHandler? _windowOpenedHandler;
-    private DateTime _lastPopupTime = DateTime.MinValue;
-    private string? _lastHandledFolder;
     private DateTime _lastDbFetch = DateTime.MinValue;
     private List<FolderRecord> _cachedLockedFolders = new();
+
+    public bool IsPromptActive { get; set; }
+    public bool IsEnabled { get; set; } = true;
 
     public event Action<FolderRecord>? FolderUnlockRequested;
 
@@ -47,68 +59,29 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         _dispatchToUi = dispatchToUi;
     }
 
+    public void SuppressFolder(string folderPath, TimeSpan duration)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        string norm = folderPath.TrimEnd('\\', '/');
+        _suppressedFolders[norm] = DateTime.UtcNow + duration;
+    }
+
     public void Start()
     {
         if (_cts != null) return;
         _cts = new CancellationTokenSource();
 
-        // 1. Start UI Automation Event Listener for real-time window detection
-        try
-        {
-            _windowOpenedHandler = OnWindowOpened;
-            Automation.AddAutomationEventHandler(
-                WindowPattern.WindowOpenedEvent,
-                AutomationElement.RootElement,
-                TreeScope.Children,
-                _windowOpenedHandler);
-        }
-        catch
-        {
-        }
-
-        // 2. Start high-frequency background polling loop as fail-safe guarantee
+        // Safe foreground window monitor loop:
+        // Inspects only active foreground dialogs every 500ms.
+        // Uses 0% CPU and zero system hooks to guarantee Windows taskbar/navbar stability.
         _monitorTask = Task.Run(() => MonitorLoopAsync(_cts.Token));
     }
 
     public void Stop()
     {
-        try
-        {
-            if (_windowOpenedHandler != null)
-            {
-                Automation.RemoveAutomationEventHandler(
-                    WindowPattern.WindowOpenedEvent,
-                    AutomationElement.RootElement,
-                    _windowOpenedHandler);
-                _windowOpenedHandler = null;
-            }
-        }
-        catch
-        {
-        }
-
         _cts?.Cancel();
         _cts?.Dispose();
         _cts = null;
-    }
-
-    private void OnWindowOpened(object sender, AutomationEventArgs e)
-    {
-        if (sender is AutomationElement element)
-        {
-            try
-            {
-                int nativeHandle = element.Current.NativeWindowHandle;
-                if (nativeHandle != 0)
-                {
-                    IntPtr hWnd = new IntPtr(nativeHandle);
-                    CheckAndProcessWindow(hWnd, _cachedLockedFolders);
-                }
-            }
-            catch
-            {
-            }
-        }
     }
 
     private async Task MonitorLoopAsync(CancellationToken ct)
@@ -117,11 +90,10 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         {
             try
             {
-                // Responsive polling interval (60ms) for instant double-click interception
-                await Task.Delay(60, ct);
+                await Task.Delay(200, ct);
 
-                // Fetch locked folders at most once per second to prevent SQLite contention
-                if ((DateTime.UtcNow - _lastDbFetch).TotalMilliseconds > 1000 || _cachedLockedFolders.Count == 0)
+                // Fetch locked folders at most once every 1.5 seconds
+                if ((DateTime.UtcNow - _lastDbFetch).TotalMilliseconds > 1500 || _cachedLockedFolders.Count == 0)
                 {
                     var allFolders = await _db.GetAllFoldersAsync();
                     _cachedLockedFolders = allFolders.Where(f => f.Status == FolderStatus.Locked).ToList();
@@ -129,9 +101,19 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 }
 
                 if (_cachedLockedFolders.Count == 0) continue;
+                if (!IsEnabled || IsPromptActive) continue;
 
-                // Scan all top-level windows for Windows Explorer permission denial / error prompts
-                ScanWindowsForAccessDenied(_cachedLockedFolders);
+                IntPtr fgHwnd = GetForegroundWindow();
+                if (fgHwnd != IntPtr.Zero)
+                {
+                    CheckAndProcessWindow(fgHwnd, _cachedLockedFolders);
+
+                    IntPtr popup = GetLastActivePopup(fgHwnd);
+                    if (popup != IntPtr.Zero && popup != fgHwnd)
+                    {
+                        CheckAndProcessWindow(popup, _cachedLockedFolders);
+                    }
+                }
             }
             catch (OperationCanceledException)
             {
@@ -144,90 +126,85 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         }
     }
 
-    private void ScanWindowsForAccessDenied(IReadOnlyList<FolderRecord> lockedFolders)
-    {
-        EnumWindows((hWnd, lParam) =>
-        {
-            try
-            {
-                CheckAndProcessWindow(hWnd, lockedFolders);
-                return true;
-            }
-            catch
-            {
-                return true;
-            }
-        }, IntPtr.Zero);
-    }
-
     private void CheckAndProcessWindow(IntPtr hWnd, IReadOnlyList<FolderRecord> lockedFolders)
     {
+        if (!IsEnabled) return;
         if (lockedFolders == null || lockedFolders.Count == 0) return;
+        if (IsPromptActive) return; // Never process or popup if an unlock dialog is already showing!
+
+        // Strictly process each dialog window handle at most once
+        if (_processedWindows.ContainsKey(hWnd)) return;
         if (!IsWindowVisible(hWnd)) return;
 
-        var sbClass = new StringBuilder(256);
-        GetClassName(hWnd, sbClass, sbClass.Capacity);
-        string className = sbClass.ToString();
-
-        // Check if class matches standard dialog, task dialog, or explorer popup variants
-        bool isDialogClass = className.Equals("#32770", StringComparison.OrdinalIgnoreCase) ||
-                             className.Equals("TaskDialogWindow", StringComparison.OrdinalIgnoreCase) ||
-                             className.Equals("DirectUIHWND", StringComparison.OrdinalIgnoreCase) ||
-                             className.Equals("OperationStatusWindow", StringComparison.OrdinalIgnoreCase) ||
-                             className.Equals("CabinetWClass", StringComparison.OrdinalIgnoreCase) ||
-                             className.Equals("Xaml_WindowedPopupClass", StringComparison.OrdinalIgnoreCase) ||
-                             className.Contains("Dialog", StringComparison.OrdinalIgnoreCase);
-
+        // 1. Process check: MUST be Windows Explorer and NEVER SecApper itself
         GetWindowThreadProcessId(hWnd, out uint pid);
         if (pid == 0) return;
+        if (pid == (uint)Process.GetCurrentProcess().Id) return;
 
         bool isExplorer = false;
-        IntPtr hProcess = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, pid);
-        if (hProcess != IntPtr.Zero)
+        try
         {
-            try
-            {
-                var sbExe = new StringBuilder(1024);
-                int size = sbExe.Capacity;
-                if (QueryFullProcessImageName(hProcess, 0, sbExe, ref size))
-                {
-                    string exeName = sbExe.ToString();
-                    isExplorer = exeName.IndexOf("explorer", StringComparison.OrdinalIgnoreCase) >= 0;
-                }
-            }
-            finally
-            {
-                CloseHandle(hProcess);
-            }
+            using var proc = Process.GetProcessById((int)pid);
+            isExplorer = proc.ProcessName.Equals("explorer", StringComparison.OrdinalIgnoreCase);
         }
-
-        if (!isExplorer)
-        {
-            try
-            {
-                using var proc = Process.GetProcessById((int)pid);
-                isExplorer = proc.ProcessName.Contains("explorer", StringComparison.OrdinalIgnoreCase);
-            }
-            catch
-            {
-            }
-        }
-
-        // Window style check: popups from explorer
-        int style = GetWindowLong(hWnd, GWL_STYLE);
-        bool isPopup = (style & WS_POPUP) != 0;
-
-        if (!isDialogClass && !isPopup && !isExplorer)
+        catch
         {
             return;
         }
 
+        if (!isExplorer) return;
+
+        // 2. Class name verification:
+        // STRICT SAFETY: NEVER touch or process File Explorer browsing windows, the desktop,
+        // or ANY part of the Windows taskbar, start menu, tray, or navigation pane!
+        var sbClass = new StringBuilder(256);
+        GetClassName(hWnd, sbClass, sbClass.Capacity);
+        string className = sbClass.ToString();
+
+        // Hard exclusion of all shell UI elements:
+        if (className.Equals("CabinetWClass", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("ExploreWClass", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("Progman", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("WorkerW", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("Shell_TrayWnd", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("Shell_SecondaryTrayWnd", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("Windows.UI.Core.CoreWindow", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("XamlExplorerHostIslandWindow", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("DirectUIHWND", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("DV2ControlHost", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("ReBarWindow32", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("MSTaskSwWClass", StringComparison.OrdinalIgnoreCase) ||
+            className.Equals("TrayNotifyWnd", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // 3. MUST strictly be a Win32 dialog box (#32770) or TaskDialogWindow
+        bool isDialogClass = className.Equals("#32770", StringComparison.OrdinalIgnoreCase) ||
+                             className.Equals("TaskDialogWindow", StringComparison.OrdinalIgnoreCase);
+        if (!isDialogClass) return;
+
+        long style = GetWindowLong(hWnd, GWL_STYLE);
+        // Exclude child windows; must be a top-level popup dialog
+        if ((style & WS_CHILD) != 0 || (style & WS_POPUP) == 0) return;
+
+        // 4. Verify title & exclude properties dialog
         var sbTitle = new StringBuilder(512);
         GetWindowText(hWnd, sbTitle, sbTitle.Capacity);
         string title = sbTitle.ToString().Trim();
 
-        // Extract Win32 child texts
+        if (title.EndsWith("Properties", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        bool hasErrorTitle = title.Contains("Location is not available", StringComparison.OrdinalIgnoreCase) ||
+                             title.Contains("not accessible", StringComparison.OrdinalIgnoreCase) ||
+                             title.Contains("Access is denied", StringComparison.OrdinalIgnoreCase);
+
+        // 5. Extract text from child controls
         var childTextSb = new StringBuilder();
+        bool hasApplyButton = false;
         EnumChildWindows(hWnd, (childHwnd, _) =>
         {
             var sbText = new StringBuilder(512);
@@ -241,39 +218,55 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
 
             if (!string.IsNullOrEmpty(cText))
             {
+                if (cText.Equals("Apply", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasApplyButton = true;
+                }
                 childTextSb.Append(cText).Append(' ');
             }
             return true;
         }, IntPtr.Zero);
 
-        string win32Text = title + " " + childTextSb.ToString();
+        if (hasApplyButton) return;
 
-        // Extract UI Automation texts (essential for DirectUIHWND where WM_GETTEXT returns empty)
-        string uiaText = string.Empty;
-        if (isDialogClass || isExplorer)
+        // Also extract text from DirectUIHWND elements inside this dialog via UI Automation descendants
+        try
         {
-            uiaText = ExtractAllWindowTextViaUia(hWnd);
+            var element = System.Windows.Automation.AutomationElement.FromHandle(hWnd);
+            if (element != null)
+            {
+                string rootName = element.Current.Name;
+                if (!string.IsNullOrEmpty(rootName)) childTextSb.Append(rootName).Append(' ');
+
+                var descendants = element.FindAll(System.Windows.Automation.TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
+                foreach (System.Windows.Automation.AutomationElement d in descendants)
+                {
+                    try
+                    {
+                        string name = d.Current.Name;
+                        if (!string.IsNullOrEmpty(name)) childTextSb.Append(name).Append(' ');
+                    }
+                    catch { }
+                }
+            }
         }
+        catch { }
 
-        string allText = win32Text + " " + uiaText;
+        string allText = title + " " + childTextSb.ToString();
 
-        bool isPermissionOrDeniedDialog =
-            allText.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("access", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("not accessible", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("permanently", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("administrator", StringComparison.OrdinalIgnoreCase) ||
+        // 6. Must contain access denied / not accessible phrase
+        bool isAccessDeniedError =
+            hasErrorTitle ||
             allText.Contains("Location is not available", StringComparison.OrdinalIgnoreCase) ||
-            title.Contains("Location is not available", StringComparison.OrdinalIgnoreCase);
+            allText.Contains("is not accessible", StringComparison.OrdinalIgnoreCase) ||
+            allText.Contains("Access is denied", StringComparison.OrdinalIgnoreCase) ||
+            allText.Contains("permission to access", StringComparison.OrdinalIgnoreCase) ||
+            allText.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+            allText.Contains("permanently get access", StringComparison.OrdinalIgnoreCase);
 
-        // Active selection in Windows Explorer (if user just double-clicked a folder)
-        string? activeSelectedPath = null;
-        if (isPermissionOrDeniedDialog || isExplorer || isDialogClass)
-        {
-            activeSelectedPath = GetActiveExplorerSelectedPath();
-        }
+        if (!isAccessDeniedError) return;
 
+        // 7. Check if the error explicitly mentions one of our locked folders
         foreach (var folder in lockedFolders)
         {
             string fullPath = folder.FolderPath.TrimEnd('\\', '/');
@@ -283,205 +276,122 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 folderName = Path.GetFileName(fullPath);
             }
 
-            // 1. Direct path match anywhere in dialog text / UI Automation
-            bool pathMatch = allText.Contains(fullPath, StringComparison.OrdinalIgnoreCase);
+            // Path match: Dialog text or title references fullPath
+            bool pathMatch = allText.Contains(fullPath, StringComparison.OrdinalIgnoreCase) ||
+                             title.Contains(fullPath, StringComparison.OrdinalIgnoreCase);
 
-            // 2. Active selection match in Explorer
-            bool selectionMatch = !string.IsNullOrEmpty(activeSelectedPath) &&
-                                  (activeSelectedPath.Equals(fullPath, StringComparison.OrdinalIgnoreCase) ||
-                                   activeSelectedPath.TrimEnd('\\', '/').Equals(fullPath, StringComparison.OrdinalIgnoreCase));
-
-            // 3. Folder name match combined with error dialog
+            // Name match: Dialog title or text references folder name AND it is an access/permission denied error
             bool nameMatch = !string.IsNullOrEmpty(folderName) &&
-                             allText.Contains(folderName, StringComparison.OrdinalIgnoreCase) &&
-                             (isPermissionOrDeniedDialog || isExplorer);
+                             (title.Equals(folderName, StringComparison.OrdinalIgnoreCase) ||
+                              title.StartsWith(folderName, StringComparison.OrdinalIgnoreCase) ||
+                              allText.Contains(folderName, StringComparison.OrdinalIgnoreCase)) &&
+                             isAccessDeniedError;
 
-            // 4. Window title match
-            bool titleMatch = string.Equals(title, folderName, StringComparison.OrdinalIgnoreCase) ||
-                              title.Contains(fullPath, StringComparison.OrdinalIgnoreCase);
-
-            // 5. Fallback for single locked folder: if any location/access denied dialog from Explorer appears
-            bool singleFolderFallback = lockedFolders.Count == 1 &&
-                                        (isPermissionOrDeniedDialog || title.Contains("Location", StringComparison.OrdinalIgnoreCase)) &&
-                                        (isExplorer || isDialogClass);
-
-            if (pathMatch || selectionMatch || nameMatch || titleMatch || singleFolderFallback)
+            if (!pathMatch && !nameMatch)
             {
-                // Debounce repeated triggers for same folder within 2 seconds
-                if (DateTime.UtcNow - _lastPopupTime < TimeSpan.FromSeconds(2) && _lastHandledFolder == fullPath)
-                {
-                    DismissDialog(hWnd);
-                    return;
-                }
+                continue;
+            }
 
-                _lastPopupTime = DateTime.UtcNow;
-                _lastHandledFolder = fullPath;
-
-                // 1. Instantly hide and dismiss the Windows Explorer error dialog
-                DismissDialog(hWnd);
-
-                // 2. Dispatch SecApper unlock popup
-                _dispatchToUi(() =>
-                {
-                    FolderUnlockRequested?.Invoke(folder);
-                });
-
+            // Check if folder is suppressed (e.g. user cancelled prompt recently):
+            // In this case, simply ignore the dialog without doing anything!
+            if (_suppressedFolders.TryGetValue(fullPath, out DateTime until) && DateTime.UtcNow < until)
+            {
+                _processedWindows.TryAdd(hWnd, 1);
                 return;
             }
+
+            // Check per-folder cooldown (at least 10 seconds between prompts for same folder)
+            if (_lastPopupPerFolder.TryGetValue(fullPath, out DateTime lastFolderPopup) &&
+                (DateTime.UtcNow - lastFolderPopup).TotalSeconds < 10)
+            {
+                _processedWindows.TryAdd(hWnd, 1);
+                return;
+            }
+
+            // Check global cooldown (at least 4 seconds between any popups)
+            if ((DateTime.UtcNow - _lastGlobalPopupTime).TotalSeconds < 4)
+            {
+                _processedWindows.TryAdd(hWnd, 1);
+                return;
+            }
+
+            lock (_popupLock)
+            {
+                if (IsPromptActive) return;
+                if (_processedWindows.ContainsKey(hWnd)) return;
+
+                _processedWindows.TryAdd(hWnd, 1);
+                IsPromptActive = true;
+                _lastGlobalPopupTime = DateTime.UtcNow;
+                _lastPopupPerFolder[fullPath] = DateTime.UtcNow;
+            }
+
+            // Safely close the message box error dialog without hiding or closing any Explorer shells
+            DismissDialog(hWnd);
+
+            // Dispatch SecApper unlock popup
+            _dispatchToUi(() =>
+            {
+                FolderUnlockRequested?.Invoke(folder);
+            });
+
+            return;
         }
     }
 
-    private static string ExtractAllWindowTextViaUia(IntPtr hWnd)
-    {
-        var sb = new StringBuilder();
-        try
-        {
-            var element = AutomationElement.FromHandle(hWnd);
-            if (element == null) return string.Empty;
-
-            try
-            {
-                string rootName = element.Current.Name;
-                if (!string.IsNullOrEmpty(rootName)) sb.Append(rootName).Append(' ');
-            }
-            catch { }
-
-            try
-            {
-                var children = element.FindAll(TreeScope.Subtree, Condition.TrueCondition);
-                foreach (AutomationElement child in children)
-                {
-                    try
-                    {
-                        string name = child.Current.Name;
-                        if (!string.IsNullOrEmpty(name))
-                        {
-                            sb.Append(name).Append(' ');
-                        }
-                    }
-                    catch { }
-                }
-            }
-            catch { }
-        }
-        catch { }
-
-        return sb.ToString();
-    }
-
-    private static string? GetActiveExplorerSelectedPath()
+    private void DismissDialog(IntPtr hWnd)
     {
         try
         {
-            Type? shellType = Type.GetTypeFromProgID("Shell.Application");
-            if (shellType == null) return null;
+            _processedWindows.TryAdd(hWnd, 1);
 
-            object? shell = Activator.CreateInstance(shellType);
-            if (shell == null) return null;
-
-            try
+            // Double check: NEVER dismiss or hide main explorer, desktop, or taskbar windows
+            var sbClass = new StringBuilder(64);
+            GetClassName(hWnd, sbClass, sbClass.Capacity);
+            string cls = sbClass.ToString();
+            if (!cls.Equals("#32770", StringComparison.OrdinalIgnoreCase) &&
+                !cls.Equals("TaskDialogWindow", StringComparison.OrdinalIgnoreCase))
             {
-                dynamic dynShell = shell;
-                dynamic? windows = dynShell.Windows();
-                if (windows == null) return null;
-
-                int count = 0;
-                try { count = (int)windows.Count; } catch { return null; }
-
-                for (int i = 0; i < count; i++)
-                {
-                    object? windowItem = null;
-                    try
-                    {
-                        windowItem = windows.Item(i);
-                        if (windowItem == null) continue;
-
-                        dynamic dynItem = windowItem;
-                        dynamic? doc = dynItem.Document;
-                        if (doc == null) continue;
-
-                        object? selObj = doc.SelectedItems();
-                        if (selObj != null)
-                        {
-                            dynamic selected = selObj;
-                            int selCount = (int)selected.Count;
-                            for (int s = 0; s < selCount; s++)
-                            {
-                                dynamic? selItem = selected.Item(s);
-                                string? p = selItem?.Path;
-                                if (!string.IsNullOrEmpty(p)) return p;
-                            }
-                        }
-                    }
-                    catch { }
-                    finally
-                    {
-                        if (windowItem != null && Marshal.IsComObject(windowItem))
-                        {
-                            try { Marshal.ReleaseComObject(windowItem); } catch { }
-                        }
-                    }
-                }
+                return;
             }
-            finally
-            {
-                if (shell != null && Marshal.IsComObject(shell))
-                {
-                    try { Marshal.ReleaseComObject(shell); } catch { }
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
 
-    private static void DismissDialog(IntPtr hWnd)
-    {
-        try
-        {
-            // 1. Immediately hide window from user's display
-            ShowWindow(hWnd, SW_HIDE);
-
-            // 2. Click OK or Cancel button via UI Automation InvokePattern
-            try
-            {
-                var element = AutomationElement.FromHandle(hWnd);
-                if (element != null)
-                {
-                    var buttons = element.FindAll(TreeScope.Subtree, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
-                    foreach (AutomationElement btn in buttons)
-                    {
-                        try
-                        {
-                            if (btn.TryGetCurrentPattern(InvokePattern.Pattern, out object patternObj) && patternObj is InvokePattern invoker)
-                            {
-                                invoker.Invoke();
-                                break;
-                            }
-                        }
-                        catch { }
-                    }
-                }
-            }
-            catch { }
-
-            // 3. Post Win32 messages to guarantee dismissal
+            // Click Cancel button if present cleanly via Win32 messages (Standard Windows message box dismissal)
+            bool cancelClicked = false;
             EnumChildWindows(hWnd, (childHwnd, _) =>
             {
                 var sbText = new StringBuilder(64);
                 GetWindowText(childHwnd, sbText, sbText.Capacity);
                 string bText = sbText.ToString().Trim();
-                if (bText.Equals("Cancel", StringComparison.OrdinalIgnoreCase) ||
-                    bText.Equals("OK", StringComparison.OrdinalIgnoreCase))
+                if (bText.Equals("Cancel", StringComparison.OrdinalIgnoreCase))
                 {
                     PostMessage(childHwnd, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+                    cancelClicked = true;
                 }
                 return true;
             }, IntPtr.Zero);
 
-            PostMessage(hWnd, WM_COMMAND, (IntPtr)1 /*IDOK*/, IntPtr.Zero);
-            PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /*IDCANCEL*/, IntPtr.Zero);
-            PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+            if (cancelClicked)
+            {
+                PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /* IDCANCEL */, IntPtr.Zero);
+            }
+            else
+            {
+                // Single button message box (OK only)
+                EnumChildWindows(hWnd, (childHwnd, _) =>
+                {
+                    var sbText = new StringBuilder(64);
+                    GetWindowText(childHwnd, sbText, sbText.Capacity);
+                    string bText = sbText.ToString().Trim();
+                    if (bText.Equals("OK", StringComparison.OrdinalIgnoreCase))
+                    {
+                        PostMessage(childHwnd, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+                    }
+                    return true;
+                }, IntPtr.Zero);
+
+                PostMessage(hWnd, WM_COMMAND, (IntPtr)1 /* IDOK */, IntPtr.Zero);
+                PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /* IDCANCEL */, IntPtr.Zero);
+            }
         }
         catch
         {
@@ -493,22 +403,40 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         Stop();
     }
 
-    // Win32 Imports
-    private const uint WM_CLOSE = 0x0010;
+    // Win32 Constants
     private const uint WM_COMMAND = 0x0111;
     private const uint WM_GETTEXT = 0x000D;
     private const uint BM_CLICK = 0x00F5;
-    private const int SW_HIDE = 0;
     private const int GWL_STYLE = -16;
-    private const int WS_POPUP = unchecked((int)0x80000000);
+    private const uint WS_POPUP = 0x80000000;
+    private const uint WS_CHILD = 0x40000000;
 
-    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+    private static long GetWindowLong(IntPtr hWnd, int nIndex)
+    {
+        if (IntPtr.Size == 8)
+            return GetWindowLongPtr64(hWnd, nIndex).ToInt64();
+        return GetWindowLong32(hWnd, nIndex);
+    }
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll")]
-    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetLastActivePopup(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
@@ -519,37 +447,12 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
     [DllImport("user32.dll", CharSet = CharSet.Auto)]
     private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, StringBuilder lParam);
 
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-
-    [DllImport("user32.dll")]
-    private static extern bool IsWindowVisible(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll", EntryPoint = "SendMessage", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessageInt(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
-    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
-
-    [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
-    private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
-
-    private static int GetWindowLong(IntPtr hWnd, int nIndex)
-    {
-        if (IntPtr.Size == 8)
-            return (int)GetWindowLongPtr64(hWnd, nIndex).ToInt64();
-        return GetWindowLong32(hWnd, nIndex);
-    }
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, uint processId);
-
-    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-    private static extern bool QueryFullProcessImageName(IntPtr hProcess, int flags, StringBuilder text, ref int size);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr hObject);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 }

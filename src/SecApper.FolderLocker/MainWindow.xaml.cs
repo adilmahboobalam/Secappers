@@ -71,10 +71,17 @@ public partial class MainWindow : Window
         _trayService = new SystemTrayService();
         _updateService = new UpdateService(_db);
 
-        // Ensure Windows Explorer context menus are active
+        // Ensure Windows Explorer context menus and startup registration are active according to settings
         try
         {
-            _explorerService.EnableContextMenu();
+            string explorerEnabled = _db.GetSettingAsync("ExplorerIntegrationEnabled", "true").GetAwaiter().GetResult() ?? "true";
+            if (explorerEnabled == "true")
+            {
+                _explorerService.EnableContextMenu();
+            }
+
+            string startWithWin = _db.GetSettingAsync("StartWithWindows", "true").GetAwaiter().GetResult() ?? "true";
+            _explorerService.SetStartWithWindows(startWithWin == "true");
         }
         catch
         {
@@ -122,6 +129,12 @@ public partial class MainWindow : Window
 
         // 3. Active Explorer Double-Click Interceptor
         _accessMonitor = new LockedFolderAccessMonitorService(_db, action => Dispatcher.BeginInvoke(action));
+        try
+        {
+            string explorerEnabled = _db.GetSettingAsync("ExplorerIntegrationEnabled", "true").GetAwaiter().GetResult() ?? "true";
+            _accessMonitor.IsEnabled = (explorerEnabled == "true");
+        }
+        catch { }
         _accessMonitor.FolderUnlockRequested += async folder =>
         {
             try
@@ -133,7 +146,11 @@ public partial class MainWindow : Window
                 App.LogError("FolderUnlockRequested", ex);
             }
         };
-        _accessMonitor.Start();
+        if (_accessMonitor.IsEnabled)
+        {
+            _accessMonitor.Start();
+        }
+        _explorerWindowMonitor.Start();
 
         _trayService.OpenRequested += RestoreWindow;
         _trayService.ExitRequested += () =>
@@ -164,7 +181,9 @@ public partial class MainWindow : Window
                 _passwordService,
                 _pathValidator,
                 _trayService,
-                _explorerWindowMonitor);
+                _explorerWindowMonitor,
+                _accessMonitor,
+                _explorerService);
 
             // Connect WebView2 IPC message listener
             webView.CoreWebView2.WebMessageReceived += async (s, args) =>
@@ -190,7 +209,10 @@ public partial class MainWindow : Window
             }
 
             // Start background monitor services
-            _accessMonitor.Start();
+            if (_accessMonitor.IsEnabled)
+            {
+                _accessMonitor.Start();
+            }
             _explorerWindowMonitor.Start();
 
             // Handle CLI args (e.g. Explorer right click --unlock <path>)
@@ -208,16 +230,21 @@ public partial class MainWindow : Window
 
     public async Task PromptUnlockPopupAsync(FolderRecord folder)
     {
-        if (_activeUnlockDialog != null && _activeUnlockFolderId == folder.Id)
+        if (_activeUnlockDialog != null)
         {
-            var helper = new System.Windows.Interop.WindowInteropHelper(_activeUnlockDialog);
-            if (helper.Handle != IntPtr.Zero)
+            if (_activeUnlockFolderId == folder.Id)
             {
-                Views.UnlockDialog.ForceForeground(helper.Handle);
+                var helper = new System.Windows.Interop.WindowInteropHelper(_activeUnlockDialog);
+                if (helper.Handle != IntPtr.Zero)
+                {
+                    Views.UnlockDialog.ForceForeground(helper.Handle);
+                }
+                _activeUnlockDialog.Activate();
             }
-            _activeUnlockDialog.Activate();
             return;
         }
+
+        _accessMonitor.IsPromptActive = true;
 
         var unlockVm = new UnlockDialogViewModel
         {
@@ -290,11 +317,18 @@ public partial class MainWindow : Window
                     _explorerWindowMonitor.TrackFolderWindow(folder.Id, folder.FolderPath);
                 }
             }
+            else
+            {
+                // User cancelled or closed the dialog without unlocking!
+                // Suppress automatic prompts for this folder so it does NOT repeatedly pop up!
+                _accessMonitor.SuppressFolder(folder.FolderPath, TimeSpan.FromSeconds(60));
+            }
         }
         finally
         {
             _activeUnlockDialog = null;
             _activeUnlockFolderId = null;
+            _accessMonitor.IsPromptActive = false;
         }
     }
 
@@ -313,6 +347,13 @@ public partial class MainWindow : Window
             if (argsList.Count > 0)
             {
                 string targetPath = argsList[0];
+                if (targetPath.Equals("--exit", StringComparison.OrdinalIgnoreCase) ||
+                    targetPath.Equals("--shutdown", StringComparison.OrdinalIgnoreCase))
+                {
+                    ShutdownApp();
+                    return;
+                }
+
                 if (targetPath.Equals("--unlock", StringComparison.OrdinalIgnoreCase) && argsList.Count > 1)
                 {
                     targetPath = argsList[1];

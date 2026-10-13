@@ -31,6 +31,8 @@ public class VueBridgeController
     private readonly IFolderPathValidator _pathValidator;
     private readonly SystemTrayService _trayService;
     private readonly IExplorerWindowMonitorService? _explorerWindowMonitor;
+    private readonly ILockedFolderAccessMonitorService? _accessMonitor;
+    private readonly IExplorerIntegrationService? _explorerService;
     private SecApper.Security.Updates.UpdateInfo? _lastUpdateInfo;
     private string? _downloadedPackagePath;
 
@@ -46,7 +48,9 @@ public class VueBridgeController
         IPasswordService passwordService,
         IFolderPathValidator pathValidator,
         SystemTrayService trayService,
-        IExplorerWindowMonitorService? explorerWindowMonitor = null)
+        IExplorerWindowMonitorService? explorerWindowMonitor = null,
+        ILockedFolderAccessMonitorService? accessMonitor = null,
+        IExplorerIntegrationService? explorerService = null)
     {
         _window = window;
         _webView = webView;
@@ -60,6 +64,8 @@ public class VueBridgeController
         _pathValidator = pathValidator;
         _trayService = trayService;
         _explorerWindowMonitor = explorerWindowMonitor;
+        _accessMonitor = accessMonitor;
+        _explorerService = explorerService;
     }
 
     public async Task HandleMessageAsync(string messageJson)
@@ -588,11 +594,29 @@ public class VueBridgeController
                 if (payload.TryGetProperty("massModificationThreshold", out var mmt))
                     await _db.SetSettingAsync("MassModificationThreshold", mmt.GetInt32().ToString());
                 if (payload.TryGetProperty("explorerIntegrationEnabled", out var eie))
-                    await _db.SetSettingAsync("ExplorerIntegrationEnabled", eie.GetBoolean() ? "true" : "false");
+                {
+                    bool enabled = eie.GetBoolean();
+                    await _db.SetSettingAsync("ExplorerIntegrationEnabled", enabled ? "true" : "false");
+                    if (_accessMonitor != null)
+                    {
+                        _accessMonitor.IsEnabled = enabled;
+                        if (enabled) _accessMonitor.Start();
+                        else _accessMonitor.Stop();
+                    }
+                    if (_explorerService != null)
+                    {
+                        if (enabled) _explorerService.EnableContextMenu();
+                        else _explorerService.DisableContextMenu();
+                    }
+                }
                 if (payload.TryGetProperty("darkMode", out var dm))
                     await _db.SetSettingAsync("DarkMode", dm.GetBoolean() ? "true" : "false");
                 if (payload.TryGetProperty("startWithWindows", out var sww))
-                    await _db.SetSettingAsync("StartWithWindows", sww.GetBoolean() ? "true" : "false");
+                {
+                    bool enabled = sww.GetBoolean();
+                    await _db.SetSettingAsync("StartWithWindows", enabled ? "true" : "false");
+                    _explorerService?.SetStartWithWindows(enabled);
+                }
                 if (payload.TryGetProperty("minimizeToTray", out var mtt))
                     await _db.SetSettingAsync("MinimizeToTray", mtt.GetBoolean() ? "true" : "false");
 
@@ -707,6 +731,10 @@ public class VueBridgeController
             {
                 string? completed = await _db.GetSettingAsync("SetupCompleted", "false");
                 string userName = await _db.GetSettingAsync("UserProfile_Name") ?? Environment.UserName;
+                if (string.IsNullOrWhiteSpace(userName) || userName.Equals("Security User", StringComparison.OrdinalIgnoreCase))
+                {
+                    userName = Environment.UserName;
+                }
                 string userRole = await _db.GetSettingAsync("UserProfile_Role") ?? "Security Administrator";
                 string avatar = await _db.GetSettingAsync("UserProfile_Avatar") ?? "shield-cyan";
                 string securityTier = await _db.GetSettingAsync("UserProfile_SecurityTier") ?? "Standard";

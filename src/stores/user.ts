@@ -7,17 +7,17 @@ import { useSecurityStore } from './security';
 
 export const useUserStore = defineStore('user', () => {
   const profile = ref<UserProfile>({
-    userName: 'Security User',
+    userName: '',
     userRole: 'Security Administrator',
     avatar: 'shield-cyan',
     securityTier: 'Standard',
     installationId: 'SEC-INITIALIZING',
     setupDate: undefined,
-    isCompleted: true,
+    isCompleted: false,
   });
 
   const initialData = ref<SetupInitialData | null>(null);
-  const isSetupCompleted = ref<boolean>(true);
+  const isSetupCompleted = ref<boolean>(false);
   const showSetupWizard = ref<boolean>(false);
   const loading = ref<boolean>(false);
   const error = ref<string | null>(null);

@@ -1,9 +1,9 @@
 {
-  "version": "1.1.3",
+  "version": "1.1.4",
   "releaseDate": "2026-10-13",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "64f05232ed5c60befb533d691eaeaa34f49a57cbad212e45542a992347952b1a",
+  "sha256": "7e0071e2c30c35aa0237eda30ea017319f09fbe137bc378274de4acf422cf4f7",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "releaseNotes": "SecApper Live Update v1.1.3:\n• Fixed One-Time Unlock Popup Limit: Resolved window handle caching and excessive suppression timeouts. The standalone unlock modal now reliably appears every time you double-click any locked folder in Windows Explorer.\n• Fast Jitter-Free Debounce: Replaced permanent dialog handle blacklisting with a short 1.5-second TTL cache, allowing seamless repeated access attempts.\n• Dynamic Invalidation & Re-Lock Sync: Instantly clears suppression and refreshes the folder monitor cache as soon as a folder is locked or auto-locked.\n• Standalone Double-Click Unlock Modal: Cleanly intercepts Explorer access-denied dialogs and displays the SecApper unlock modal without opening the full application window.\n• Automatic Re-Lock on Window Close: When an unlocked folder's Explorer window is closed, SecApper automatically re-applies NTFS security permissions."
+  "releaseNotes": "SecApper Live Update v1.1.4:\n• Windows 11 Multi-Tab Explorer Support: Fixed unlock popup interception in Windows 11 File Explorer by actively enumerating top-level dialogs across XAML island tabs.\n• Removed Style Constraints: Accommodates modern Windows 11 dialog and TaskDialog window styles without legacy WS_POPUP style restrictions.\n• Enhanced DirectUI Dismissal: Gracefully closes Windows 11 error prompts using UI Automation Cancel invoke and WM_CLOSE without hanging Explorer.\n• Force Foreground Enhancement: Uses SetWindowPos (HWND_TOPMOST) and AllowSetForegroundWindow to guarantee the unlock popup always appears directly on top in Windows 11.\n• Automatic Re-Lock & Reliable Repeated Double-Clicks: Works seamlessly across repeated attempts on both Windows 10 and Windows 11."
 }

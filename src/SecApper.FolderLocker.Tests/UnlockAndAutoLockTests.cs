@@ -186,13 +186,15 @@ public class UnlockAndAutoLockTests : IDisposable
         Assert.True(monitor.IsEnabled);
         Assert.False(monitor.IsPromptActive);
 
-        // Test suppression
+        // Test suppression and unsuppression
         monitor.SuppressFolder(_targetFolder, TimeSpan.FromSeconds(30));
+        monitor.UnsuppressFolder(_targetFolder);
+        monitor.RefreshLockedFolders();
         
-        // Test prompt active state flag
+        // Test prompt active state flag and reset
         monitor.IsPromptActive = true;
         Assert.True(monitor.IsPromptActive);
-        monitor.IsPromptActive = false;
+        monitor.ResetPromptState();
         Assert.False(monitor.IsPromptActive);
 
         // Test enabled toggle

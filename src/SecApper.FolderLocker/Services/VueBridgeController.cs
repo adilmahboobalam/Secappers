@@ -200,6 +200,8 @@ public class VueBridgeController
                     var updated = await _db.GetFolderByIdAsync(folder.Id);
                     if (updated != null)
                     {
+                        _accessMonitor?.UnsuppressFolder(updated.FolderPath);
+                        _accessMonitor?.RefreshLockedFolders();
                         _ransomwareService.StartMonitoringFolder(updated);
                         return new { success = true, folder = MapFolder(updated) };
                     }
@@ -217,6 +219,11 @@ public class VueBridgeController
                 if (unlockResult.Success)
                 {
                     var updated = await _db.GetFolderByIdAsync(folderId);
+                    if (updated != null)
+                    {
+                        _accessMonitor?.UnsuppressFolder(updated.FolderPath);
+                        _accessMonitor?.RefreshLockedFolders();
+                    }
                     return new
                     {
                         success = true,

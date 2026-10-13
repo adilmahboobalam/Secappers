@@ -18,6 +18,9 @@ public interface ILockedFolderAccessMonitorService : IDisposable
     void Start();
     void Stop();
     void SuppressFolder(string folderPath, TimeSpan duration);
+    void UnsuppressFolder(string folderPath);
+    void RefreshLockedFolders();
+    void ResetPromptState();
     bool IsPromptActive { get; set; }
     bool IsEnabled { get; set; }
     event Action<FolderRecord>? FolderUnlockRequested;
@@ -30,7 +33,7 @@ public interface ILockedFolderAccessMonitorService : IDisposable
 /// user double-clicking the folder icon), this service intercepts the dialog,
 /// cleanly dismisses the message box, and triggers the SecApper unlock popup.
 /// 
-/// Uses gentle foreground window inspection (500ms heartbeat) without invasive
+/// Uses gentle foreground window inspection (200ms heartbeat) without invasive
 /// system hooks or UI automation tree dumping to ensure Windows Explorer,
 /// the taskbar, and navigation pane are NEVER frozen, hidden, or corrupted.
 /// </summary>
@@ -40,8 +43,9 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
     private readonly Action<Action> _dispatchToUi;
     private readonly ConcurrentDictionary<string, DateTime> _suppressedFolders = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, DateTime> _lastPopupPerFolder = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<IntPtr, byte> _processedWindows = new();
+    private readonly ConcurrentDictionary<IntPtr, DateTime> _processedWindows = new();
     private DateTime _lastGlobalPopupTime = DateTime.MinValue;
+    private DateTime _lastPromptStartTime = DateTime.MinValue;
     private readonly object _popupLock = new();
     private CancellationTokenSource? _cts;
     private Task? _monitorTask;
@@ -66,13 +70,31 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         _suppressedFolders[norm] = DateTime.UtcNow + duration;
     }
 
+    public void UnsuppressFolder(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        string norm = folderPath.TrimEnd('\\', '/');
+        _suppressedFolders.TryRemove(norm, out _);
+        _lastPopupPerFolder.TryRemove(norm, out _);
+    }
+
+    public void RefreshLockedFolders()
+    {
+        _lastDbFetch = DateTime.MinValue;
+    }
+
+    public void ResetPromptState()
+    {
+        IsPromptActive = false;
+    }
+
     public void Start()
     {
         if (_cts != null) return;
         _cts = new CancellationTokenSource();
 
         // Safe foreground window monitor loop:
-        // Inspects only active foreground dialogs every 500ms.
+        // Inspects active foreground dialogs every 200ms.
         // Uses 0% CPU and zero system hooks to guarantee Windows taskbar/navbar stability.
         _monitorTask = Task.Run(() => MonitorLoopAsync(_cts.Token));
     }
@@ -92,7 +114,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
             {
                 await Task.Delay(200, ct);
 
-                // Fetch locked folders at most once every 1.5 seconds
+                // Fetch locked folders at most once every 1.5 seconds (or immediately if invalidated)
                 if ((DateTime.UtcNow - _lastDbFetch).TotalMilliseconds > 1500 || _cachedLockedFolders.Count == 0)
                 {
                     var allFolders = await _db.GetAllFoldersAsync();
@@ -101,7 +123,27 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 }
 
                 if (_cachedLockedFolders.Count == 0) continue;
+
+                // Watchdog: If prompt has been active for over 45s without resetting, clear it to avoid permanent freeze
+                if (IsPromptActive && (DateTime.UtcNow - _lastPromptStartTime).TotalSeconds > 45)
+                {
+                    IsPromptActive = false;
+                }
+
                 if (!IsEnabled || IsPromptActive) continue;
+
+                // Housekeeping: remove old or dead window handles from cache
+                if (_processedWindows.Count > 10)
+                {
+                    DateTime cutoff = DateTime.UtcNow - TimeSpan.FromSeconds(5);
+                    foreach (var entry in _processedWindows)
+                    {
+                        if (entry.Value < cutoff || !IsWindow(entry.Key))
+                        {
+                            _processedWindows.TryRemove(entry.Key, out _);
+                        }
+                    }
+                }
 
                 IntPtr fgHwnd = GetForegroundWindow();
                 if (fgHwnd != IntPtr.Zero)
@@ -132,8 +174,12 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         if (lockedFolders == null || lockedFolders.Count == 0) return;
         if (IsPromptActive) return; // Never process or popup if an unlock dialog is already showing!
 
-        // Strictly process each dialog window handle at most once
-        if (_processedWindows.ContainsKey(hWnd)) return;
+        // Debounce dialog window handle if it was processed recently (< 1.5 seconds)
+        if (_processedWindows.TryGetValue(hWnd, out DateTime lastProcessed) &&
+            DateTime.UtcNow - lastProcessed < TimeSpan.FromSeconds(1.5))
+        {
+            return;
+        }
         if (!IsWindowVisible(hWnd)) return;
 
         // 1. Process check: MUST be Windows Explorer and NEVER SecApper itself
@@ -296,32 +342,37 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
             // In this case, simply ignore the dialog without doing anything!
             if (_suppressedFolders.TryGetValue(fullPath, out DateTime until) && DateTime.UtcNow < until)
             {
-                _processedWindows.TryAdd(hWnd, 1);
+                _processedWindows[hWnd] = DateTime.UtcNow;
                 return;
             }
 
-            // Check per-folder cooldown (at least 10 seconds between prompts for same folder)
+            // Check per-folder cooldown (at least 1.5s between prompts for same folder to absorb double-click jitter)
             if (_lastPopupPerFolder.TryGetValue(fullPath, out DateTime lastFolderPopup) &&
-                (DateTime.UtcNow - lastFolderPopup).TotalSeconds < 10)
+                (DateTime.UtcNow - lastFolderPopup).TotalSeconds < 1.5)
             {
-                _processedWindows.TryAdd(hWnd, 1);
+                _processedWindows[hWnd] = DateTime.UtcNow;
                 return;
             }
 
-            // Check global cooldown (at least 4 seconds between any popups)
-            if ((DateTime.UtcNow - _lastGlobalPopupTime).TotalSeconds < 4)
+            // Check global cooldown (at least 1.0s between any popups)
+            if ((DateTime.UtcNow - _lastGlobalPopupTime).TotalSeconds < 1.0)
             {
-                _processedWindows.TryAdd(hWnd, 1);
+                _processedWindows[hWnd] = DateTime.UtcNow;
                 return;
             }
 
             lock (_popupLock)
             {
                 if (IsPromptActive) return;
-                if (_processedWindows.ContainsKey(hWnd)) return;
+                if (_processedWindows.TryGetValue(hWnd, out DateTime lp) &&
+                    DateTime.UtcNow - lp < TimeSpan.FromSeconds(1.5))
+                {
+                    return;
+                }
 
-                _processedWindows.TryAdd(hWnd, 1);
+                _processedWindows[hWnd] = DateTime.UtcNow;
                 IsPromptActive = true;
+                _lastPromptStartTime = DateTime.UtcNow;
                 _lastGlobalPopupTime = DateTime.UtcNow;
                 _lastPopupPerFolder[fullPath] = DateTime.UtcNow;
             }
@@ -343,7 +394,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
     {
         try
         {
-            _processedWindows.TryAdd(hWnd, 1);
+            _processedWindows[hWnd] = DateTime.UtcNow;
 
             // Double check: NEVER dismiss or hide main explorer, desktop, or taskbar windows
             var sbClass = new StringBuilder(64);
@@ -432,6 +483,9 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
 
     [DllImport("user32.dll")]
     private static extern bool IsWindowVisible(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);

@@ -1,9 +1,9 @@
 {
-  "version": "1.1.2",
+  "version": "1.1.3",
   "releaseDate": "2026-10-13",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "32bc3d8cff6701d6d7dd4206ef29716a965a385b5d64a64e34423ea2819561d6",
+  "sha256": "64f05232ed5c60befb533d691eaeaa34f49a57cbad212e45542a992347952b1a",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "releaseNotes": "SecApper Live Update v1.1.2:\n• Standalone Double-Click Unlock Modal: Double-clicking any locked folder in Windows Explorer immediately presents the centered Unlock popup dialog without opening the main application window.\n• DirectUI & Windows 11 Explorer Interception: Deep descendant UI Automation inspects Explorer dialogs and cleanly dismisses permission prompts via IDCANCEL.\n• Concurrency & Lock-Free Downloader: Uses isolated staging and verifies existing packages to eliminate 'used by another process' file access conflicts.\n• Preserved Taskbar & Shell Integrity: Fixed installer Restart Manager settings to never interrupt explorer.exe, taskbar, or system tray.\n• Automatic Re-Lock: Once unlocked and viewed in Windows Explorer, closing that folder window automatically re-locks the folder.\n• Fully Dynamic User Setup: Replaced static profile defaults with per-user database storage in %LocalAppData%."
+  "releaseNotes": "SecApper Live Update v1.1.3:\n• Fixed One-Time Unlock Popup Limit: Resolved window handle caching and excessive suppression timeouts. The standalone unlock modal now reliably appears every time you double-click any locked folder in Windows Explorer.\n• Fast Jitter-Free Debounce: Replaced permanent dialog handle blacklisting with a short 1.5-second TTL cache, allowing seamless repeated access attempts.\n• Dynamic Invalidation & Re-Lock Sync: Instantly clears suppression and refreshes the folder monitor cache as soon as a folder is locked or auto-locked.\n• Standalone Double-Click Unlock Modal: Cleanly intercepts Explorer access-denied dialogs and displays the SecApper unlock modal without opening the full application window.\n• Automatic Re-Lock on Window Close: When an unlocked folder's Explorer window is closed, SecApper automatically re-applies NTFS security permissions."
 }

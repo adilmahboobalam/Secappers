@@ -102,6 +102,9 @@ public partial class MainWindow : Window
                 var lockResult = await _lockService.LockFolderAsync(folderId);
                 if (lockResult.Success)
                 {
+                    _accessMonitor?.UnsuppressFolder(folder.FolderPath);
+                    _accessMonitor?.RefreshLockedFolders();
+
                     _trayService.ShowNotification(
                         "SecApper Auto-Lock",
                         $"Folder '{folder.FolderName}' has been automatically re-locked because its window was closed.");
@@ -144,6 +147,7 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 App.LogError("FolderUnlockRequested", ex);
+                _accessMonitor.IsPromptActive = false;
             }
         };
         if (_accessMonitor.IsEnabled)
@@ -315,13 +319,15 @@ public partial class MainWindow : Window
 
                     // Track window to automatically re-lock when window closes!
                     _explorerWindowMonitor.TrackFolderWindow(folder.Id, folder.FolderPath);
+                    _accessMonitor.UnsuppressFolder(folder.FolderPath);
+                    _accessMonitor.RefreshLockedFolders();
                 }
             }
             else
             {
                 // User cancelled or closed the dialog without unlocking!
-                // Suppress automatic prompts for this folder so it does NOT repeatedly pop up!
-                _accessMonitor.SuppressFolder(folder.FolderPath, TimeSpan.FromSeconds(60));
+                // Brief 2-second debounce to prevent immediate mouse click bounce while dialog closes
+                _accessMonitor.SuppressFolder(folder.FolderPath, TimeSpan.FromSeconds(2));
             }
         }
         finally

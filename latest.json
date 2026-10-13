@@ -2,8 +2,8 @@
   "version": "1.1.2",
   "releaseDate": "2026-10-13",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "1425b204bafefbedbb843234db22c03c4e62826b51091ad3f01b311caaa5e1c4",
+  "sha256": "32bc3d8cff6701d6d7dd4206ef29716a965a385b5d64a64e34423ea2819561d6",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "releaseNotes": "SecApper Live Update v1.1.2:\n• Standalone Double-Click Unlock Modal: Double-clicking any locked folder in Windows Explorer immediately presents the centered Unlock popup dialog without opening the main application window.\n• DirectUI & Windows 11 Explorer Interception: Deep descendant UI Automation inspects Explorer dialogs and cleanly dismisses permission prompts via IDCANCEL.\n• Preserved Taskbar & Shell Integrity: Fixed installer Restart Manager settings to never interrupt explorer.exe, taskbar, or system tray.\n• Automatic Re-Lock: Once unlocked and viewed in Windows Explorer, closing that folder window automatically re-locks the folder.\n• Fully Dynamic User Setup: Replaced static profile defaults with per-user database storage in %LocalAppData%."
+  "releaseNotes": "SecApper Live Update v1.1.2:\n• Standalone Double-Click Unlock Modal: Double-clicking any locked folder in Windows Explorer immediately presents the centered Unlock popup dialog without opening the main application window.\n• DirectUI & Windows 11 Explorer Interception: Deep descendant UI Automation inspects Explorer dialogs and cleanly dismisses permission prompts via IDCANCEL.\n• Concurrency & Lock-Free Downloader: Uses isolated staging and verifies existing packages to eliminate 'used by another process' file access conflicts.\n• Preserved Taskbar & Shell Integrity: Fixed installer Restart Manager settings to never interrupt explorer.exe, taskbar, or system tray.\n• Automatic Re-Lock: Once unlocked and viewed in Windows Explorer, closing that folder window automatically re-locks the folder.\n• Fully Dynamic User Setup: Replaced static profile defaults with per-user database storage in %LocalAppData%."
 }

@@ -219,6 +219,45 @@ public class UpdateService : IUpdateService
         if (string.IsNullOrEmpty(ext)) ext = ".exe";
         string targetFile = Path.Combine(updatesDir, $"SecApperUpdate_{update.Version}{ext}");
 
+        // 1. If target update package already exists and passes SHA-256 verification, reuse it immediately
+        if (File.Exists(targetFile))
+        {
+            try
+            {
+                if (VerifyUpdatePackage(targetFile, update, out _))
+                {
+                    progress?.Report(new UpdateProgress(100, 100, "Update package verified and ready to install."));
+                    return targetFile;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        // 2. Kill any lingering installer processes from prior attempts to release file locks
+        try
+        {
+            foreach (var proc in Process.GetProcesses())
+            {
+                try
+                {
+                    string pName = proc.ProcessName;
+                    if (pName.StartsWith("SecApperUpdate", StringComparison.OrdinalIgnoreCase) ||
+                        pName.StartsWith("SecApperFolderLockerSetup", StringComparison.OrdinalIgnoreCase))
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(1000);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        // 3. Download to a dedicated temporary file to eliminate any concurrency or locked file conflicts
+        string tempTargetFile = Path.Combine(updatesDir, $"SecApperUpdate_{update.Version}_{Guid.NewGuid():N}.tmp");
+
         progress?.Report(new UpdateProgress(0, 0, "Connecting to update source..."));
 
         if (uri.Scheme == Uri.UriSchemeFile || File.Exists(update.DownloadUrl))
@@ -227,23 +266,24 @@ public class UpdateService : IUpdateService
             var fileInfo = new FileInfo(sourcePath);
             long totalBytes = fileInfo.Length;
 
-            await using var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            await using var destStream = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
-
-            byte[] buffer = new byte[81920];
-            long totalRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await sourceStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+            await using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            await using (var destStream = new FileStream(tempTargetFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
             {
-                await destStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                totalRead += bytesRead;
-                progress?.Report(new UpdateProgress(totalRead, totalBytes, $"Copying update package ({totalRead / (1024 * 1024)} MB / {totalBytes / (1024 * 1024)} MB)..."));
-                await Task.Delay(15, ct); // Smooth progress animation
+                byte[] buffer = new byte[81920];
+                long totalRead = 0;
+                int bytesRead;
+
+                while ((bytesRead = await sourceStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+                {
+                    await destStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                    totalRead += bytesRead;
+                    progress?.Report(new UpdateProgress(totalRead, totalBytes, $"Copying update package ({totalRead / (1024 * 1024)} MB / {totalBytes / (1024 * 1024)} MB)..."));
+                    await Task.Delay(15, ct); // Smooth progress animation
+                }
             }
 
-            progress?.Report(new UpdateProgress(totalRead, totalBytes, "Download completed. Verifying package..."));
-            return targetFile;
+            progress?.Report(new UpdateProgress(totalBytes, totalBytes, "Download completed. Verifying package..."));
+            return FinalizeDownloadedPackage(tempTargetFile, targetFile, ext, update);
         }
         else
         {
@@ -282,9 +322,18 @@ public class UpdateService : IUpdateService
                     string? foundLocal = localCandidates.FirstOrDefault(p => File.Exists(p));
                     if (foundLocal != null)
                     {
-                        File.Copy(foundLocal, targetFile, true);
+                        string safeTarget = targetFile;
+                        try
+                        {
+                            File.Copy(foundLocal, targetFile, true);
+                        }
+                        catch (IOException)
+                        {
+                            safeTarget = Path.Combine(updatesDir, $"SecApperUpdate_{update.Version}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}");
+                            File.Copy(foundLocal, safeTarget, true);
+                        }
                         progress?.Report(new UpdateProgress(100, 100, "Update package staged from local verified release build."));
-                        return targetFile;
+                        return safeTarget;
                     }
                 }
 
@@ -307,9 +356,18 @@ public class UpdateService : IUpdateService
                 string? foundLocal = localCandidates.FirstOrDefault(p => File.Exists(p));
                 if (foundLocal != null)
                 {
-                    File.Copy(foundLocal, targetFile, true);
+                    string safeTarget = targetFile;
+                    try
+                    {
+                        File.Copy(foundLocal, targetFile, true);
+                    }
+                    catch (IOException)
+                    {
+                        safeTarget = Path.Combine(updatesDir, $"SecApperUpdate_{update.Version}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}");
+                        File.Copy(foundLocal, safeTarget, true);
+                    }
                     progress?.Report(new UpdateProgress(100, 100, "Update package staged from local verified release build."));
-                    return targetFile;
+                    return safeTarget;
                 }
 
                 throw new InvalidOperationException($"Could not download update package from server: {ex.Message}", ex);
@@ -323,7 +381,7 @@ public class UpdateService : IUpdateService
                 totalBytes = response.Content.Headers.ContentLength ?? -1;
 
                 await using var contentStream = await response.Content.ReadAsStreamAsync(ct);
-                await using var fileStream = new FileStream(targetFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+                await using var fileStream = new FileStream(tempTargetFile, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
 
                 byte[] buffer = new byte[81920];
                 int bytesRead;
@@ -340,7 +398,36 @@ public class UpdateService : IUpdateService
             }
 
             progress?.Report(new UpdateProgress(totalRead, totalBytes, "Download completed. Verifying package..."));
-            return targetFile;
+            return FinalizeDownloadedPackage(tempTargetFile, targetFile, ext, update);
+        }
+    }
+
+    private static string FinalizeDownloadedPackage(string tempPath, string desiredTargetFile, string ext, UpdateInfo update)
+    {
+        try
+        {
+            if (File.Exists(desiredTargetFile))
+            {
+                try { File.Delete(desiredTargetFile); } catch { }
+            }
+            File.Move(tempPath, desiredTargetFile, true);
+            return desiredTargetFile;
+        }
+        catch
+        {
+            // If desiredTargetFile is locked by another process (e.g. antivirus or previous instance),
+            // move to a unique timestamped executable path so execution succeeds with zero errors!
+            string updatesDir = Path.GetDirectoryName(desiredTargetFile) ?? Path.GetTempPath();
+            string uniqueExecutable = Path.Combine(updatesDir, $"SecApperUpdate_{update.Version}_{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{ext}");
+            try
+            {
+                File.Move(tempPath, uniqueExecutable, true);
+                return uniqueExecutable;
+            }
+            catch
+            {
+                return tempPath;
+            }
         }
     }
 

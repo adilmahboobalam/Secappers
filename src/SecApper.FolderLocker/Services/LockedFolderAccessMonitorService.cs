@@ -157,25 +157,24 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                     }
                 }
 
-                // Windows 11 & Multi-Tab File Explorer:
-                // File Explorer tabs use XAML Islands where modal dialogs (#32770 / TaskDialogWindow)
-                // are often separate top-level windows that GetLastActivePopup() on CabinetWClass misses.
-                // Enumerate top-level dialogs directly:
+                // Windows 11 compatibility: In Windows 11, File Explorer error dialogs (#32770 / TaskDialog)
+                // are often created on background threads without receiving foreground focus.
+                // Enumerate visible top-level windows to immediately detect and process them.
                 if (!IsPromptActive)
                 {
-                    EnumWindows((topHwnd, _) =>
+                    EnumWindows((hWnd, _) =>
                     {
                         if (IsPromptActive) return false;
-                        if (!IsWindowVisible(topHwnd)) return true;
+                        if (!IsWindowVisible(hWnd)) return true;
 
-                        var sbCls = new StringBuilder(64);
-                        GetClassName(topHwnd, sbCls, sbCls.Capacity);
-                        string cls = sbCls.ToString();
+                        var sbClass = new StringBuilder(64);
+                        GetClassName(hWnd, sbClass, sbClass.Capacity);
+                        string cls = sbClass.ToString();
 
                         if (cls.Equals("#32770", StringComparison.OrdinalIgnoreCase) ||
                             cls.Equals("TaskDialogWindow", StringComparison.OrdinalIgnoreCase))
                         {
-                            CheckAndProcessWindow(topHwnd, _cachedLockedFolders);
+                            CheckAndProcessWindow(hWnd, _cachedLockedFolders);
                         }
                         return true;
                     }, IntPtr.Zero);
@@ -255,7 +254,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         if (!isDialogClass) return;
 
         long style = GetWindowLong(hWnd, GWL_STYLE);
-        // Exclude child controls; must be a top-level dialog (supports Windows 10 & 11 styles)
+        // Exclude child controls; must be a top-level dialog
         if ((style & WS_CHILD) != 0) return;
 
         // 4. Verify title & exclude properties dialog
@@ -275,6 +274,8 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
         // 5. Extract text from child controls
         var childTextSb = new StringBuilder();
         bool hasApplyButton = false;
+        bool hasContinueButton = false;
+        bool hasCancelButton = false;
         EnumChildWindows(hWnd, (childHwnd, _) =>
         {
             var sbText = new StringBuilder(512);
@@ -292,6 +293,14 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 {
                     hasApplyButton = true;
                 }
+                if (cText.Equals("Continue", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasContinueButton = true;
+                }
+                if (cText.Equals("Cancel", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasCancelButton = true;
+                }
                 childTextSb.Append(cText).Append(' ');
             }
             return true;
@@ -299,7 +308,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
 
         if (hasApplyButton) return;
 
-        // Also extract text from DirectUIHWND / TaskDialog elements inside this dialog via UI Automation descendants
+        // Also extract text from DirectUIHWND elements inside this dialog via UI Automation descendants
         try
         {
             var element = System.Windows.Automation.AutomationElement.FromHandle(hWnd);
@@ -315,17 +324,6 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                     {
                         string name = d.Current.Name;
                         if (!string.IsNullOrEmpty(name)) childTextSb.Append(name).Append(' ');
-
-                        // Windows 11 DirectUI: Extract HelpText and ValuePattern
-                        string help = d.Current.HelpText;
-                        if (!string.IsNullOrEmpty(help)) childTextSb.Append(help).Append(' ');
-
-                        if (d.TryGetCurrentPattern(System.Windows.Automation.ValuePattern.Pattern, out var valPattern) &&
-                            valPattern is System.Windows.Automation.ValuePattern vp &&
-                            !string.IsNullOrEmpty(vp.Current.Value))
-                        {
-                            childTextSb.Append(vp.Current.Value).Append(' ');
-                        }
                     }
                     catch { }
                 }
@@ -335,22 +333,18 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
 
         string allText = title + " " + childTextSb.ToString();
 
-        // 6. Must contain access denied / not accessible phrase (Windows 10 & Windows 11 shell variants)
+        // 6. Must contain access denied / not accessible phrase, or be Windows 11 permission TaskDialog (Continue & Cancel buttons)
         bool isAccessDeniedError =
             hasErrorTitle ||
+            (hasContinueButton && hasCancelButton) ||
+            hasContinueButton ||
             allText.Contains("Location is not available", StringComparison.OrdinalIgnoreCase) ||
             allText.Contains("is not accessible", StringComparison.OrdinalIgnoreCase) ||
             allText.Contains("Access is denied", StringComparison.OrdinalIgnoreCase) ||
             allText.Contains("permission to access", StringComparison.OrdinalIgnoreCase) ||
             allText.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
             allText.Contains("permanently get access", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("don't currently have permission", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("do not currently have permission", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("You must have read permissions", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("Folder Access Denied", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("Destination Folder Access Denied", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("You need permission to perform this action", StringComparison.OrdinalIgnoreCase) ||
-            allText.Contains("Click Continue to permanently get access", StringComparison.OrdinalIgnoreCase);
+            allText.Contains("Continue", StringComparison.OrdinalIgnoreCase);
 
         if (!isAccessDeniedError) return;
 
@@ -372,6 +366,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
             bool nameMatch = !string.IsNullOrEmpty(folderName) &&
                              (title.Equals(folderName, StringComparison.OrdinalIgnoreCase) ||
                               title.StartsWith(folderName, StringComparison.OrdinalIgnoreCase) ||
+                              title.EndsWith(folderName, StringComparison.OrdinalIgnoreCase) ||
                               allText.Contains(folderName, StringComparison.OrdinalIgnoreCase)) &&
                              isAccessDeniedError;
 
@@ -455,8 +450,7 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
                 var sbText = new StringBuilder(64);
                 GetWindowText(childHwnd, sbText, sbText.Capacity);
                 string bText = sbText.ToString().Trim();
-                if (bText.Equals("Cancel", StringComparison.OrdinalIgnoreCase) ||
-                    bText.Equals("Close", StringComparison.OrdinalIgnoreCase))
+                if (bText.Equals("Cancel", StringComparison.OrdinalIgnoreCase))
                 {
                     PostMessage(childHwnd, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
                     cancelClicked = true;
@@ -467,48 +461,24 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
             if (cancelClicked)
             {
                 PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /* IDCANCEL */, IntPtr.Zero);
-                PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
             }
             else
             {
-                // Windows 11 DirectUI: Attempt to invoke Cancel/Close button via UI Automation
-                try
+                // Single button message box (OK only)
+                EnumChildWindows(hWnd, (childHwnd, _) =>
                 {
-                    var element = System.Windows.Automation.AutomationElement.FromHandle(hWnd);
-                    if (element != null)
+                    var sbText = new StringBuilder(64);
+                    GetWindowText(childHwnd, sbText, sbText.Capacity);
+                    string bText = sbText.ToString().Trim();
+                    if (bText.Equals("OK", StringComparison.OrdinalIgnoreCase))
                     {
-                        var buttons = element.FindAll(
-                            System.Windows.Automation.TreeScope.Descendants,
-                            new System.Windows.Automation.PropertyCondition(
-                                System.Windows.Automation.AutomationElement.ControlTypeProperty,
-                                System.Windows.Automation.ControlType.Button));
-
-                        foreach (System.Windows.Automation.AutomationElement btn in buttons)
-                        {
-                            try
-                            {
-                                string btnName = btn.Current.Name;
-                                if (btnName.Equals("Cancel", StringComparison.OrdinalIgnoreCase) ||
-                                    btnName.Equals("Close", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    if (btn.TryGetCurrentPattern(System.Windows.Automation.InvokePattern.Pattern, out var invObj) &&
-                                        invObj is System.Windows.Automation.InvokePattern inv)
-                                    {
-                                        inv.Invoke();
-                                        cancelClicked = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            catch { }
-                        }
+                        PostMessage(childHwnd, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
                     }
-                }
-                catch { }
+                    return true;
+                }, IntPtr.Zero);
 
-                PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /* IDCANCEL */, IntPtr.Zero);
                 PostMessage(hWnd, WM_COMMAND, (IntPtr)1 /* IDOK */, IntPtr.Zero);
-                PostMessage(hWnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                PostMessage(hWnd, WM_COMMAND, (IntPtr)2 /* IDCANCEL */, IntPtr.Zero);
             }
         }
         catch
@@ -525,8 +495,8 @@ public class LockedFolderAccessMonitorService : ILockedFolderAccessMonitorServic
     private const uint WM_COMMAND = 0x0111;
     private const uint WM_GETTEXT = 0x000D;
     private const uint BM_CLICK = 0x00F5;
-    private const uint WM_CLOSE = 0x0010;
     private const int GWL_STYLE = -16;
+    private const uint WS_POPUP = 0x80000000;
     private const uint WS_CHILD = 0x40000000;
 
     private static long GetWindowLong(IntPtr hWnd, int nIndex)

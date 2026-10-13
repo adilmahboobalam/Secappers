@@ -2,8 +2,8 @@
   "version": "1.1.4",
   "releaseDate": "2026-10-13",
   "downloadUrl": "https://github.com/adilmahboobalam/Secappers/raw/main/installer/output/SecApperFolderLockerSetup_v1.1.0.exe",
-  "sha256": "7e0071e2c30c35aa0237eda30ea017319f09fbe137bc378274de4acf422cf4f7",
+  "sha256": "5615ff76659b38c87ec49e8bc5cb193d3ba75ad43245cc18684f98d6749aee19",
   "mandatory": false,
   "minSupportedVersion": "1.0.0",
-  "releaseNotes": "SecApper Live Update v1.1.4:\n• Windows 11 Multi-Tab Explorer Support: Fixed unlock popup interception in Windows 11 File Explorer by actively enumerating top-level dialogs across XAML island tabs.\n• Removed Style Constraints: Accommodates modern Windows 11 dialog and TaskDialog window styles without legacy WS_POPUP style restrictions.\n• Enhanced DirectUI Dismissal: Gracefully closes Windows 11 error prompts using UI Automation Cancel invoke and WM_CLOSE without hanging Explorer.\n• Force Foreground Enhancement: Uses SetWindowPos (HWND_TOPMOST) and AllowSetForegroundWindow to guarantee the unlock popup always appears directly on top in Windows 11.\n• Automatic Re-Lock & Reliable Repeated Double-Clicks: Works seamlessly across repeated attempts on both Windows 10 and Windows 11."
+  "releaseNotes": "SecApper Live Update v1.1.4:\n• Windows 11 File Explorer Support: Added top-level window enumeration to detect background and unfocused TaskDialogs in Windows 11 File Explorer.\n• Native Windows 11 Permission Dialog Interception: Successfully recognizes Windows 11 TaskDialogs (with Continue/Cancel action buttons) matching locked folder names and cleanly dismisses them.\n• Standalone Double-Click Unlock Modal: Reliably displays the centered Unlock popup dialog on both Windows 10 and Windows 11 without opening the main application window.\n• Jitter-Free Debounce & Fast Re-Lock: Eliminates permanent HWND blacklisting and synchronizes cache invalidation on lock/auto-lock."
 }
